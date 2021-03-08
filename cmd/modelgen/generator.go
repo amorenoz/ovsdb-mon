@@ -54,7 +54,7 @@ func (g *Generator) PrintImports(imports [][]string) {
 func (g *Generator) Format() []byte {
 	gen, err := format.Source(g.buf.Bytes())
 	if err != nil {
-		log.Printf("WARNING:", err)
+		log.Println("WARNING:", err)
 	}
 	return gen
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -59,11 +60,16 @@ func main() {
 		addr = "unix:" + ovs_rundir + "/" + ovnnbSocket
 	}
 
+	dbModel, err := model.DBModel()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	config := goovn.Config{
 		Db:          goovn.DBNB,
 		Addr:        addr,
 		ORMSignalCB: ormSignal{},
-		DBModel:     model.DBModel(),
+		DBModel:     dbModel,
 	}
 	orm, err := goovn.NewORMClient(&config)
 	if err != nil {

@@ -1,7 +1,11 @@
 github.com/amorenoz/go-ovn v0.1.1-0.20210224132231-0c3456d64341 h1:faQ5KGGvIXOXmn7ivqaBJjJ/yB57gyo8EhCApXK2XOM=
 github.com/amorenoz/go-ovn v0.1.1-0.20210224132231-0c3456d64341/go.mod h1:GRIJmBexOpAROrZxYDMnF3ca6WYXxqkbLf8NLIp3X1g=
+github.com/amorenoz/go-ovn v0.1.1-0.20210305093751-39f4443b448d h1:p7AjjLYdIZSQ+MN94j0RK3uH3eCzyvl0aYdbRjMlAXY=
+github.com/amorenoz/go-ovn v0.1.1-0.20210305093751-39f4443b448d/go.mod h1:ozqnCmbSPuoGRJvZxDEOVAXd/F/Lyr27976cmLL9wl8=
 github.com/amorenoz/libovsdb v0.2.1-0.20210223160324-916daff1677b h1:48XQjWRAc+C1vS5dab7fJfAHlhdGjZFVfLiyAbhBJS8=
 github.com/amorenoz/libovsdb v0.2.1-0.20210223160324-916daff1677b/go.mod h1:PTzqmBaVTOgGqKH05sIO2B6tauEwb5X000PvIKwLGd4=
+github.com/amorenoz/libovsdb v0.2.1-0.20210305093614-80f588f3e2db h1:7ilcb1RL51pKspczGOknPjeRmAJpbbDqBjOIOE/fqqw=
+github.com/amorenoz/libovsdb v0.2.1-0.20210305093614-80f588f3e2db/go.mod h1:PTzqmBaVTOgGqKH05sIO2B6tauEwb5X000PvIKwLGd4=
 github.com/cenk/hub v1.0.1 h1:RBwXNOF4a8KjD8BJ08XqN8KbrqaGiQLDrgvUGJSHuPA=
 github.com/cenk/hub v1.0.1/go.mod h1:rJM1LNAW0ppT8FMMuPK6c2NP/R2nH/UthtuRySSaf6Y=
 github.com/cenkalti/hub v1.0.1-0.20160527103212-11382a9960d3 h1:JoNNeZqjMj74cMtMUi456vOlL/4Kwk1C3sU6e62caJA=

@@ -73,19 +73,20 @@ func (g *DbModelGenerator) Generate() error {
 /*PrintDBModel generates a Model constructor such as this:
 
 func DBModel() goovn.DBModel {
-    return goovn.DBModel {
-	"Table_Name": NewTableName,
-	...
-    }
+    return goovn.NewDBModel ([]Model {
+	&LogicalSwitch{},
+	&LogicalRouter{},
+...
+    })
 }
 */
 func (g *DbModelGenerator) PrintDBModel() {
-	g.Printf("func DBModel() goovn.DBModel {\n")
-	g.Printf("\treturn goovn.DBModel {\n")
+	g.Printf("func DBModel() (*goovn.DBModel, error){\n")
+	g.Printf("\treturn goovn.NewDBModel ([]goovn.Model {\n")
 	for _, table := range g.tables {
-		g.Printf("\t\t\"%s\":New%s,\n", table.name, table.TableTypeName())
+		g.Printf("\t\t&%s{},\n", table.TableTypeName())
 	}
-	g.Printf("\t}\n")
+	g.Printf("\t})\n")
 	g.Printf("}\n")
 }
 

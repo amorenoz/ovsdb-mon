@@ -111,12 +111,6 @@ func (g *TableGenerator) PrintTableStruct() {
 	g.Printf("func (*%s) Table() goovn.TableName {\n", structName)
 	g.Printf("\treturn %s", g.TableVarName())
 	g.Printf("}\n")
-	// Print the New{TableName} func
-	g.Printf("// New%s returns a new %s\n", structName, structName)
-	g.Printf("func New%s(uuid string) goovn.Model {\n", structName)
-	g.Printf("\treturn &%s { UUID: uuid }", structName)
-	g.Printf("}\n")
-
 }
 
 // TODO Create an ORM Model API object per table
