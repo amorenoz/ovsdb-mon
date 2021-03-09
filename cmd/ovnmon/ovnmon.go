@@ -2,16 +2,12 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
 
 	model "github.com/amorenoz/ovnmodel/model"
 	goovn "github.com/ebay/go-ovn"
 	//"github.com/fatih/color"
-	"github.com/k0kubun/pp"
 )
 
 const (
@@ -19,35 +15,15 @@ const (
 )
 
 var (
-	orm goovn.ORMClient
-	db  = flag.String("db", "", "Database connection. Default: unix:/${OVS_RUNDIR}/ovnnb_db.sock")
+	orm  goovn.ORMClient
+	db   = flag.String("db", "", "Database connection. Default: unix:/${OVS_RUNDIR}/ovnnb_db.sock")
+	auto = flag.Bool("auto", false, "Autostart: If set to true, it will start monitoring from the begining")
 )
 
 type ormSignal struct{}
 
-func (s ormSignal) OnCreated(m goovn.Model) {
-	pp.Printf("A %s has been added!\n", m.Table())
-	pp.Println(m)
-	fmt.Printf("")
-}
-
-func (s ormSignal) OnDeleted(m goovn.Model) {
-	pp.Printf("A %s has been removed!\n", m.Table())
-	pp.Println(m)
-	fmt.Printf("")
-}
-
 func main() {
 	flag.Parse()
-	sigs := make(chan os.Signal, 1)
-	done := make(chan bool, 1)
-
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-sigs
-		fmt.Printf("Got signal %s", sig)
-		done <- true
-	}()
 
 	var addr string
 	if *db != "" {
@@ -65,10 +41,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	shell := newOvnShell(*auto)
 	config := goovn.Config{
 		Db:          goovn.DBNB,
 		Addr:        addr,
-		ORMSignalCB: ormSignal{},
+		ORMSignalCB: shell,
 		DBModel:     dbModel,
 	}
 	orm, err := goovn.NewORMClient(&config)
@@ -76,7 +53,5 @@ func main() {
 		panic(err)
 	}
 	defer orm.Close()
-	fmt.Println("Waiting for signal or new Logical Routers")
-	<-done
-	fmt.Println("Exiting")
+	shell.Run(orm)
 }
