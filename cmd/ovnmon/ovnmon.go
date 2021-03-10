@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 
@@ -23,6 +24,14 @@ var (
 type ormSignal struct{}
 
 func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "%s [FLAGS] [COMMAND] \n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "FLAGS:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "COMMAND:\n")
+		fmt.Fprintf(os.Stderr, "\tIf provided, it will run the command and exit. If not, it will enter interactive mode\n")
+		fmt.Fprintf(os.Stderr, "\tFor a full description of available commands use the command 'help'")
+	}
 	flag.Parse()
 
 	var addr string
@@ -41,7 +50,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	shell := newOvnShell(*auto)
+	shell := newOvnShell(*auto, dbModel)
 	config := goovn.Config{
 		Db:          goovn.DBNB,
 		Addr:        addr,
@@ -53,5 +62,5 @@ func main() {
 		panic(err)
 	}
 	defer orm.Close()
-	shell.Run(orm)
+	shell.Run(orm, flag.Args()...)
 }

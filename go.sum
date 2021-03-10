@@ -8,6 +8,8 @@ github.com/amorenoz/go-ovn v0.1.1-0.20210305093751-39f4443b448d h1:p7AjjLYdIZSQ+
 github.com/amorenoz/go-ovn v0.1.1-0.20210305093751-39f4443b448d/go.mod h1:ozqnCmbSPuoGRJvZxDEOVAXd/F/Lyr27976cmLL9wl8=
 github.com/amorenoz/go-ovn v0.1.1-0.20210309175803-fc72470a0885 h1:3FssF6nKW0245obz/fP5+s94EBZFe9abi7/DJkrSVKU=
 github.com/amorenoz/go-ovn v0.1.1-0.20210309175803-fc72470a0885/go.mod h1:ozqnCmbSPuoGRJvZxDEOVAXd/F/Lyr27976cmLL9wl8=
+github.com/amorenoz/go-ovn v0.1.1-0.20210309183059-6707d7ad0208 h1:jxI537Jk7qoxd7y3ae6JvLuSF1YUpHv1O6vWUwTF5/o=
+github.com/amorenoz/go-ovn v0.1.1-0.20210309183059-6707d7ad0208/go.mod h1:ozqnCmbSPuoGRJvZxDEOVAXd/F/Lyr27976cmLL9wl8=
 github.com/amorenoz/libovsdb v0.2.1-0.20210223160324-916daff1677b h1:48XQjWRAc+C1vS5dab7fJfAHlhdGjZFVfLiyAbhBJS8=
 github.com/amorenoz/libovsdb v0.2.1-0.20210223160324-916daff1677b/go.mod h1:PTzqmBaVTOgGqKH05sIO2B6tauEwb5X000PvIKwLGd4=
 github.com/amorenoz/libovsdb v0.2.1-0.20210305093614-80f588f3e2db h1:7ilcb1RL51pKspczGOknPjeRmAJpbbDqBjOIOE/fqqw=
@@ -32,6 +34,10 @@ github.com/mattn/go-colorable v0.1.8 h1:c1ghPdyEDarC70ftn0y+A/Ee++9zz8ljHG1b13eJ
 github.com/mattn/go-colorable v0.1.8/go.mod h1:u6P/XSegPjTcexA+o6vUJrdnUu04hMope9wVRipJSqc=
 github.com/mattn/go-isatty v0.0.12 h1:wuysRhFDzyxgEmMf5xjvJ2M9dZoWAXNNr5LSBS7uHXY=
 github.com/mattn/go-isatty v0.0.12/go.mod h1:cbi8OIDigv2wuxKPP5vlRcQ1OAZbq2CE4Kysco4FUpU=
+github.com/mattn/go-runewidth v0.0.9 h1:Lm995f3rfxdpd6TSmuVCHVb/QhupuXlYr8sCI/QdE+0=
+github.com/mattn/go-runewidth v0.0.9/go.mod h1:H031xJmbD/WCDINGzjvQ9THkh0rPKHF+m2gUSrubnMI=
+github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N7AbDhec=
+github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6HuIJcUGPhkA7kY=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
