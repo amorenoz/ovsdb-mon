@@ -15,6 +15,6 @@ require (
 )
 
 replace (
-	github.com/ebay/go-ovn => github.com/amorenoz/go-ovn v0.1.1-0.20210309183059-6707d7ad0208
-	github.com/ebay/libovsdb => github.com/amorenoz/libovsdb v0.2.1-0.20210305093614-80f588f3e2db
+	github.com/ebay/go-ovn => github.com/amorenoz/go-ovn v0.1.1-0.20210405115749-c9d068664ff5
+	github.com/ebay/libovsdb => github.com/amorenoz/libovsdb v0.2.1-0.20210331095715-9659fd798ffe
 )
