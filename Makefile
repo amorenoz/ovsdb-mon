@@ -1,7 +1,6 @@
 BINARY_NAME=ovnmon
 BINARY_MOD=./cmd/$(BINARY_NAME)
-GEN_NAME=modelgen
-GEN_MOD=./cmd/$(GEN_NAME)
+MODEL_GEN=$(GOPATH)/bin/modelgen
 MODEL_PATH=model
 BIN_PATH=bin
 
@@ -10,15 +9,15 @@ all: $(BIN_PATH)/$(BINARY_NAME)
 
 .PHONY: clean
 clean: 
-	@rm -r $(BIN_PATH)
-	@rm -r $(MODEL_PATH)
+	@rm -rf $(BIN_PATH)
+	@rm -rf $(MODEL_PATH)
 
 
-$(BIN_PATH)/$(GEN_NAME): $(GEN_MOD)
-	go build -o $@ ./$^
+$(MODEL_GEN):
+	go install github.com/ovn-org/libovsdb/cmd/modelgen
 
-$(MODEL_PATH): $(BIN_PATH)/$(GEN_NAME)
-	$(BIN_PATH)/$(GEN_NAME) -o $@ -p model ovn-nb.ovsschema
+$(MODEL_PATH): $(MODEL_GEN)
+	$(MODEL_GEN) -p model ovn-nb.ovsschema
 
 $(BIN_PATH)/$(BINARY_NAME): $(MODEL_PATH)
 	go build -o $@ $(BINARY_MOD)

@@ -7,16 +7,16 @@ import (
 	"strings"
 	"sync"
 
-	goovn "github.com/ebay/go-ovn"
 	"github.com/k0kubun/pp"
+	"github.com/ovn-org/libovsdb"
 	ishell "gopkg.in/abiosoft/ishell.v2"
 )
 
 type OvnShell struct {
 	mutex   *sync.RWMutex
 	monitor bool
-	orm     goovn.ORMClient
-	dbModel *goovn.DBModel
+	ovs     *libovsdb.OvsdbClient
+	dbModel *libovsdb.DBModel
 }
 
 func (s *OvnShell) Monitor(monitor bool) {
@@ -25,28 +25,41 @@ func (s *OvnShell) Monitor(monitor bool) {
 	s.monitor = monitor
 }
 
-func (s *OvnShell) OnCreated(m goovn.Model) {
+func (s *OvnShell) OnAdd(table string, m libovsdb.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	if s.monitor {
-		pp.Printf("A %s has been added\n", m.Table())
+		pp.Printf("An element of table %s has been added\n", table)
 		pp.Println(m)
 		pp.Println("")
 	}
 }
 
-func (s *OvnShell) OnDeleted(m goovn.Model) {
+func (s *OvnShell) OnUpdate(table string, old, new libovsdb.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	if s.monitor {
-		pp.Printf("A %s has been added\n", m.Table())
+		pp.Printf("An element of table %s has been updated. New value: \n", table)
+		pp.Println(new)
+		pp.Println("")
+	}
+}
+func (s *OvnShell) OnDelete(table string, m libovsdb.Model) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	if s.monitor {
+		pp.Printf("An element of table %s has been deleted\n", table)
 		pp.Println(m)
 		pp.Println("")
 	}
 }
 
-func (s *OvnShell) Run(orm goovn.ORMClient, args ...string) {
-	s.orm = orm
+func (s *OvnShell) Run(ovs *libovsdb.OvsdbClient, args ...string) {
+	s.ovs = ovs
+	ovs.Cache.AddEventHandler(s)
+	if err := ovs.MonitorAll(""); err != nil {
+		panic(err)
+	}
 	shell := ishell.New()
 	shell.Set("ovnShell", s)
 
@@ -85,7 +98,7 @@ func (s *OvnShell) Run(orm goovn.ORMClient, args ...string) {
 			c.Println("Available Tables")
 			c.Println("----------------")
 
-			for name := range ovnShell.(*OvnShell).orm.GetSchema().Tables {
+			for name := range ovnShell.(*OvnShell).ovs.Schema.Tables {
 				c.Println(name)
 			}
 		},
@@ -100,7 +113,7 @@ func (s *OvnShell) Run(orm goovn.ORMClient, args ...string) {
 
 	// To generate the completer for each subcommand we store all the possible fields per table
 	tableFields := make(map[string][]string)
-	for tname, mtype := range s.dbModel.GetTypes() {
+	for tname, mtype := range s.dbModel.Types() {
 		fields := []string{}
 		for i := 0; i < mtype.Elem().NumField(); i++ {
 			fields = append(fields, mtype.Elem().Field(i).Name)
@@ -108,7 +121,7 @@ func (s *OvnShell) Run(orm goovn.ORMClient, args ...string) {
 		tableFields[tname] = fields
 	}
 
-	for name := range s.dbModel.GetTypes() {
+	for name := range s.dbModel.Types() {
 		// Trick to be able to use name inside closures
 		tableName := name
 		subTableCmd := ishell.Cmd{
@@ -126,21 +139,17 @@ func (s *OvnShell) Run(orm goovn.ORMClient, args ...string) {
 				}
 				// Use a buffer to store the generated output table
 				buffer := bytes.Buffer{}
-				mtype := ovnShell.(*OvnShell).dbModel.GetTypes()[c.Cmd.Name]
+				mtype := ovnShell.(*OvnShell).dbModel.Types()[c.Cmd.Name]
 				printer, err := NewStructPrinter(&buffer, mtype.Elem(), c.Args...)
 				if err != nil {
 					c.Println(err)
 					return
 				}
 
-				// call ORM.List()
 				valueList := reflect.New(reflect.SliceOf(mtype.Elem()))
-				orm := ovnShell.(*OvnShell).orm
-				err = orm.List(valueList.Interface())
-				if err != nil {
-					if err == goovn.ErrorNotFound {
-						return
-					}
+				ovs := ovnShell.(*OvnShell).ovs
+				err = ovs.API.List(valueList.Interface())
+				if err != nil && err != libovsdb.ErrNotFound {
 					c.Println(err)
 					return
 				}
@@ -167,7 +176,7 @@ func (s *OvnShell) Run(orm goovn.ORMClient, args ...string) {
 	shell.Run()
 }
 
-func newOvnShell(auto bool, dbmodel *goovn.DBModel) *OvnShell {
+func newOvnShell(auto bool, dbmodel *libovsdb.DBModel) *OvnShell {
 	return &OvnShell{
 		mutex:   new(sync.RWMutex),
 		monitor: auto,
