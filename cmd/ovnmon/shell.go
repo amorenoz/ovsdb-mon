@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"reflect"
 	"strings"
 	"sync"
@@ -69,7 +71,6 @@ func (s *OvnShell) OnAdd(table string, m libovsdb.Model) {
 		s.printEvent(event)
 		s.events = append(s.events, event)
 	}
-
 }
 
 func (s *OvnShell) OnUpdate(table string, old, new libovsdb.Model) {
@@ -87,6 +88,7 @@ func (s *OvnShell) OnUpdate(table string, old, new libovsdb.Model) {
 		s.events = append(s.events, event)
 	}
 }
+
 func (s *OvnShell) OnDelete(table string, m libovsdb.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
@@ -100,6 +102,16 @@ func (s *OvnShell) OnDelete(table string, m libovsdb.Model) {
 		s.printEvent(event)
 		s.events = append(s.events, event)
 	}
+}
+
+func (s *OvnShell) Save(filePath string) error {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	content, err := json.MarshalIndent(s.events, "", "    ")
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(filePath, content, 0644)
 }
 
 func (s *OvnShell) Run(ovs *libovsdb.OvsdbClient, args ...string) {
@@ -132,6 +144,24 @@ func (s *OvnShell) Run(ovs *libovsdb.OvsdbClient, args ...string) {
 				c.Println("Error: No context")
 			}
 			ovnShell.(*OvnShell).Monitor(false)
+		},
+	})
+	shell.AddCmd(&ishell.Cmd{
+		Name: "save",
+		Help: "Save events",
+		Func: func(c *ishell.Context) {
+			ovnShell := c.Get("ovnShell")
+			if len(c.Args) != 1 {
+				c.Println("Usage: save <path>")
+				return
+			}
+			filePath := c.Args[0]
+			if err := ovnShell.(*OvnShell).Save(filePath); err != nil {
+				c.Println(err)
+			} else {
+				c.Println("File saved")
+			}
+
 		},
 	})
 
