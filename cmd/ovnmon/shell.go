@@ -6,17 +6,35 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
-	"github.com/k0kubun/pp"
+	"github.com/kylelemons/godebug/pretty"
 	"github.com/ovn-org/libovsdb"
 	ishell "gopkg.in/abiosoft/ishell.v2"
 )
+
+type eventType string
+
+const (
+	updateEvent eventType = "update"
+	addEvent    eventType = "add"
+	deleteEvent eventType = "delete"
+)
+
+type OvnEvent struct {
+	Timestamp time.Time
+	Event     eventType
+	Table     string
+	Old       libovsdb.Model
+	New       libovsdb.Model
+}
 
 type OvnShell struct {
 	mutex   *sync.RWMutex
 	monitor bool
 	ovs     *libovsdb.OvsdbClient
 	dbModel *libovsdb.DBModel
+	events  []OvnEvent
 }
 
 func (s *OvnShell) Monitor(monitor bool) {
@@ -25,32 +43,62 @@ func (s *OvnShell) Monitor(monitor bool) {
 	s.monitor = monitor
 }
 
+func (s *OvnShell) printEvent(event OvnEvent) {
+	fmt.Printf("New %s event on table %s\n", event.Event, event.Table)
+	switch event.Event {
+	case updateEvent:
+		fmt.Printf("%s\n", pretty.Compare(event.Old, event.New))
+	case addEvent:
+		pretty.Print(event.New)
+	case deleteEvent:
+		pretty.Print(event.Old)
+	}
+	fmt.Print("\n")
+}
+
 func (s *OvnShell) OnAdd(table string, m libovsdb.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	if s.monitor {
-		pp.Printf("An element of table %s has been added\n", table)
-		pp.Println(m)
-		pp.Println("")
+		event := OvnEvent{
+			Timestamp: time.Now(),
+			Event:     addEvent,
+			Table:     table,
+			New:       m,
+		}
+		s.printEvent(event)
+		s.events = append(s.events, event)
 	}
+
 }
 
 func (s *OvnShell) OnUpdate(table string, old, new libovsdb.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	if s.monitor {
-		pp.Printf("An element of table %s has been updated. New value: \n", table)
-		pp.Println(new)
-		pp.Println("")
+		event := OvnEvent{
+			Timestamp: time.Now(),
+			Event:     updateEvent,
+			Table:     table,
+			New:       new,
+			Old:       old,
+		}
+		s.printEvent(event)
+		s.events = append(s.events, event)
 	}
 }
 func (s *OvnShell) OnDelete(table string, m libovsdb.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	if s.monitor {
-		pp.Printf("An element of table %s has been deleted\n", table)
-		pp.Println(m)
-		pp.Println("")
+		event := OvnEvent{
+			Timestamp: time.Now(),
+			Event:     deleteEvent,
+			Table:     table,
+			Old:       m,
+		}
+		s.printEvent(event)
+		s.events = append(s.events, event)
 	}
 }
 
