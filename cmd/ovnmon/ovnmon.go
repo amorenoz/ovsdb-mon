@@ -7,7 +7,7 @@ import (
 	"os"
 
 	model "github.com/amorenoz/ovnmodel/model"
-	goovn "github.com/ebay/go-ovn"
+	"github.com/ovn-org/libovsdb/client"
 	//"github.com/fatih/color"
 )
 
@@ -16,7 +16,7 @@ const (
 )
 
 var (
-	orm  goovn.ORMClient
+	ovs  *client.OvsdbClient
 	db   = flag.String("db", "", "Database connection. Default: unix:/${OVS_RUNDIR}/ovnnb_db.sock")
 	auto = flag.Bool("auto", false, "Autostart: If set to true, it will start monitoring from the begining")
 )
@@ -45,22 +45,16 @@ func main() {
 		addr = "unix:" + ovs_rundir + "/" + ovnnbSocket
 	}
 
-	dbModel, err := model.DBModel()
+	dbModel, err := model.FullDatabaseModel()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	shell := newOvnShell(*auto, dbModel)
-	config := goovn.Config{
-		Db:          goovn.DBNB,
-		Addr:        addr,
-		ORMSignalCB: shell,
-		DBModel:     dbModel,
-	}
-	orm, err := goovn.NewORMClient(&config)
+	ovs, err := client.Connect(addr, dbModel, nil)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
-	defer orm.Close()
-	shell.Run(orm, flag.Args()...)
+	defer ovs.Disconnect()
+	shell.Run(ovs, flag.Args()...)
 }
