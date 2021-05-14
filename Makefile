@@ -16,10 +16,8 @@ clean:
 $(MODEL_GEN):
 	go install github.com/ovn-org/libovsdb/cmd/modelgen
 
-$(MODEL_PATH): $(MODEL_GEN)
-	$(MODEL_GEN) -p model -o model ovn-nb.ovsschema
-
-$(BIN_PATH)/$(BINARY_NAME): $(MODEL_PATH)
+$(BIN_PATH)/$(BINARY_NAME): $(MODEL_GEN)
+	PATH="$${PATH}:$${GOPATH}/bin" go generate ./...
 	go build -o $@ $(BINARY_MOD)
 
 	
