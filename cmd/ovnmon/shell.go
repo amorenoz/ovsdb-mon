@@ -2,21 +2,41 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
-	"github.com/k0kubun/pp"
+	"github.com/kylelemons/godebug/pretty"
 	"github.com/ovn-org/libovsdb/client"
 	ishell "gopkg.in/abiosoft/ishell.v2"
 )
+
+type eventType string
+
+const (
+	updateEvent eventType = "update"
+	addEvent    eventType = "add"
+	deleteEvent eventType = "delete"
+)
+
+type OvnEvent struct {
+	Timestamp time.Time
+	Event     eventType
+	Table     string
+	Old       client.Model
+	New       client.Model
+}
 
 type OvnShell struct {
 	mutex   *sync.RWMutex
 	monitor bool
 	ovs     *client.OvsdbClient
 	dbModel *client.DBModel
+	events  []OvnEvent
 }
 
 func (s *OvnShell) Monitor(monitor bool) {
@@ -25,13 +45,31 @@ func (s *OvnShell) Monitor(monitor bool) {
 	s.monitor = monitor
 }
 
+func (s *OvnShell) printEvent(event OvnEvent) {
+	fmt.Printf("New %s event on table %s\n", event.Event, event.Table)
+	switch event.Event {
+	case updateEvent:
+		fmt.Printf("%s\n", pretty.Compare(event.Old, event.New))
+	case addEvent:
+		pretty.Print(event.New)
+	case deleteEvent:
+		pretty.Print(event.Old)
+	}
+	fmt.Print("\n")
+}
+
 func (s *OvnShell) OnAdd(table string, m client.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	if s.monitor {
-		pp.Printf("An element of table %s has been added\n", table)
-		pp.Println(m)
-		pp.Println("")
+		event := OvnEvent{
+			Timestamp: time.Now(),
+			Event:     addEvent,
+			Table:     table,
+			New:       m,
+		}
+		s.printEvent(event)
+		s.events = append(s.events, event)
 	}
 }
 
@@ -39,19 +77,41 @@ func (s *OvnShell) OnUpdate(table string, old, new client.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	if s.monitor {
-		pp.Printf("An element of table %s has been updated. New value: \n", table)
-		pp.Println(new)
-		pp.Println("")
+		event := OvnEvent{
+			Timestamp: time.Now(),
+			Event:     updateEvent,
+			Table:     table,
+			New:       new,
+			Old:       old,
+		}
+		s.printEvent(event)
+		s.events = append(s.events, event)
 	}
 }
+
 func (s *OvnShell) OnDelete(table string, m client.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	if s.monitor {
-		pp.Printf("An element of table %s has been deleted\n", table)
-		pp.Println(m)
-		pp.Println("")
+		event := OvnEvent{
+			Timestamp: time.Now(),
+			Event:     deleteEvent,
+			Table:     table,
+			Old:       m,
+		}
+		s.printEvent(event)
+		s.events = append(s.events, event)
 	}
+}
+
+func (s *OvnShell) Save(filePath string) error {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	content, err := json.MarshalIndent(s.events, "", "    ")
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(filePath, content, 0644)
 }
 
 func (s *OvnShell) Run(ovs *client.OvsdbClient, args ...string) {
@@ -84,6 +144,24 @@ func (s *OvnShell) Run(ovs *client.OvsdbClient, args ...string) {
 				c.Println("Error: No context")
 			}
 			ovnShell.(*OvnShell).Monitor(false)
+		},
+	})
+	shell.AddCmd(&ishell.Cmd{
+		Name: "save",
+		Help: "Save events",
+		Func: func(c *ishell.Context) {
+			ovnShell := c.Get("ovnShell")
+			if len(c.Args) != 1 {
+				c.Println("Usage: save <path>")
+				return
+			}
+			filePath := c.Args[0]
+			if err := ovnShell.(*OvnShell).Save(filePath); err != nil {
+				c.Println(err)
+			} else {
+				c.Println("File saved")
+			}
+
 		},
 	})
 
