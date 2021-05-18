@@ -10,8 +10,6 @@ all: $(BIN_PATH)/$(BINARY_NAME)
 .PHONY: clean
 clean: 
 	@rm -rf $(BIN_PATH)
-	@rm -rf $(MODEL_PATH)
-
 
 $(MODEL_GEN):
 	go install github.com/ovn-org/libovsdb/cmd/modelgen
