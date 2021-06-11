@@ -129,7 +129,7 @@ func (s *OvnShell) Run(ovs *client.OvsdbClient, args ...string) {
 		Name: "start",
 		Help: "Start monitoring activity of the OVN DB",
 		Func: func(c *ishell.Context) {
-			ovnShell := c.Get("ovnShell")
+			ovnShell := c.Get("ovnnShell")
 			if ovnShell == nil {
 				c.Println("Error: No context")
 			}
@@ -234,10 +234,15 @@ func (s *OvnShell) Run(ovs *client.OvsdbClient, args ...string) {
 				}
 
 				// Render the result table
-				printer.Append(reflect.Indirect(valueList).Interface())
+				err = printer.Append(reflect.Indirect(valueList).Interface())
+				if err != nil {
+					c.Println(err)
+				}
 				printer.Render()
 				// Print the result table through shell so it can be paged
-				c.ShowPaged(buffer.String())
+				if err := c.ShowPaged(buffer.String()); err != nil {
+					panic(err)
+				}
 			},
 			Completer: func(args []string) []string {
 				return tableFields[tableName]
@@ -249,8 +254,9 @@ func (s *OvnShell) Run(ovs *client.OvsdbClient, args ...string) {
 
 	// If we have arguments, just run them and exit
 	if len(args) > 0 {
-		shell.Process(args...)
-		return
+		if err := shell.Process(args...); err != nil {
+			panic(err)
+		}
 	}
 	shell.Run()
 }

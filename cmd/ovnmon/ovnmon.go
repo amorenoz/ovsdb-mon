@@ -17,12 +17,9 @@ const (
 )
 
 var (
-	ovs  *client.OvsdbClient
 	db   = flag.String("db", "", "Database connection. Default: unix:/${OVS_RUNDIR}/ovnnb_db.sock")
-	auto = flag.Bool("auto", false, "Autostart: If set to true, it will start monitoring from the begining")
+	auto = flag.Bool("auto", false, "Autostart: If set to true, it will start monitoring from the beginning")
 )
-
-type ormSignal struct{}
 
 func main() {
 	flag.Usage = func() {
@@ -39,11 +36,11 @@ func main() {
 	if *db != "" {
 		addr = *db
 	} else {
-		var ovs_rundir = os.Getenv("OVS_RUNDIR")
-		if ovs_rundir == "" {
-			ovs_rundir = "/var/run/openvswitch"
+		var ovsRundir = os.Getenv("OVS_RUNDIR")
+		if ovsRundir == "" {
+			ovsRundir = "/var/run/openvswitch"
 		}
-		addr = "unix:" + ovs_rundir + "/" + ovnnbSocket
+		addr = "unix:" + ovsRundir + "/" + ovnnbSocket
 	}
 
 	dbModel, err := model.FullDatabaseModel()
