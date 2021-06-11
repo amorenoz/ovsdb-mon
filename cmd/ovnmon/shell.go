@@ -12,6 +12,7 @@ import (
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/ovn-org/libovsdb/client"
+	"github.com/ovn-org/libovsdb/model"
 	ishell "gopkg.in/abiosoft/ishell.v2"
 )
 
@@ -27,15 +28,15 @@ type OvnEvent struct {
 	Timestamp time.Time
 	Event     eventType
 	Table     string
-	Old       client.Model
-	New       client.Model
+	Old       model.Model
+	New       model.Model
 }
 
 type OvnShell struct {
 	mutex   *sync.RWMutex
 	monitor bool
 	ovs     *client.OvsdbClient
-	dbModel *client.DBModel
+	dbModel *model.DBModel
 	events  []OvnEvent
 }
 
@@ -58,7 +59,7 @@ func (s *OvnShell) printEvent(event OvnEvent) {
 	fmt.Print("\n")
 }
 
-func (s *OvnShell) OnAdd(table string, m client.Model) {
+func (s *OvnShell) OnAdd(table string, m model.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	if s.monitor {
@@ -73,7 +74,7 @@ func (s *OvnShell) OnAdd(table string, m client.Model) {
 	}
 }
 
-func (s *OvnShell) OnUpdate(table string, old, new client.Model) {
+func (s *OvnShell) OnUpdate(table string, old, new model.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	if s.monitor {
@@ -89,7 +90,7 @@ func (s *OvnShell) OnUpdate(table string, old, new client.Model) {
 	}
 }
 
-func (s *OvnShell) OnDelete(table string, m client.Model) {
+func (s *OvnShell) OnDelete(table string, m model.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	if s.monitor {
@@ -226,7 +227,7 @@ func (s *OvnShell) Run(ovs *client.OvsdbClient, args ...string) {
 
 				valueList := reflect.New(reflect.SliceOf(mtype.Elem()))
 				ovs := ovnShell.(*OvnShell).ovs
-				err = ovs.API.List(valueList.Interface())
+				err = ovs.List(valueList.Interface())
 				if err != nil && err != client.ErrNotFound {
 					c.Println(err)
 					return
@@ -254,7 +255,7 @@ func (s *OvnShell) Run(ovs *client.OvsdbClient, args ...string) {
 	shell.Run()
 }
 
-func newOvnShell(auto bool, dbmodel *client.DBModel) *OvnShell {
+func newOvnShell(auto bool, dbmodel *model.DBModel) *OvnShell {
 	return &OvnShell{
 		mutex:   new(sync.RWMutex),
 		monitor: auto,

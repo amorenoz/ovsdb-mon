@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -51,7 +52,7 @@ func main() {
 	}
 
 	shell := newOvnShell(*auto, dbModel)
-	ovs, err := client.Connect(addr, dbModel, nil)
+	ovs, err := client.Connect(context.Background(), dbModel, client.WithEndpoint(addr))
 	if err != nil {
 		log.Fatal(err)
 	}
