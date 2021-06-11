@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 
-	model "github.com/amorenoz/ovnmodel/model"
+	model "github.com/amorenoz/ovnmon/model"
 	"github.com/ovn-org/libovsdb/client"
 	//"github.com/fatih/color"
 )

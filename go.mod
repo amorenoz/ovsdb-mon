@@ -1,4 +1,4 @@
-module github.com/amorenoz/ovnmodel
+module github.com/amorenoz/ovnmon
 
 go 1.15
 
