@@ -12,11 +12,11 @@ clean:
 	@rm -rf $(BIN_PATH)
 
 $(MODEL_GEN):
-	go install github.com/ovn-org/libovsdb/cmd/modelgen
+	@go install github.com/ovn-org/libovsdb/cmd/modelgen
 
 $(BIN_PATH)/$(BINARY_NAME): $(MODEL_GEN)
-	PATH="$${PATH}:$${GOPATH}/bin" go generate ./...
-	go build -o $@ $(BINARY_MOD)
+	@export PATH="$${PATH}:$${GOPATH}/bin";  go generate ./...
+	@go build -o $@ $(BINARY_MOD)
 
 	
 

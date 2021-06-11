@@ -65,7 +65,6 @@ func NewStructPrinter(writer io.Writer, stype reflect.Type, fieldSel ...string) 
 			}
 		}
 		cols = fieldSel
-		cols = fieldSel
 	} else {
 		for i := 0; i < stype.NumField(); i++ {
 			field := stype.Field(i).Name
