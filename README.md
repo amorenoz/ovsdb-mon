@@ -3,14 +3,14 @@
 ovnmon is a OVN monitoring and visulization tool based on [libovsdb](https://github.com/ovn-org/libovsdb)
 
 ### Building ovnmon
-By default, ovnmon uses the schema defined in *model/ovn-nb.ovsschema*. If you want to use your own,
+By default, ovnmon uses the schema defined in *schemas/ovn-nb.ovsschema*. If you want to use your own,
 simply download it from your ovsdb server and replace the existing one
 
-     ovsdb-client get-schema ${SERVER} ${DATABASE} > model/ovn-nb.ovsschema
+     ovsdb-client get-schema ${SERVER} ${DATABASE} > schemas/my.ovsschema
 
-Then, just build the program
+Then, just build the program specifying a schema file
 
-     make
+     make SCHEMA=schemas/my.ovsschema
 
 This will use modelgen to generate a native model of the DB and use it to build ovnmon
 

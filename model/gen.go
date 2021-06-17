@@ -1,3 +1,3 @@
 package model
 
-//go:generate modelgen -p model -o . ovn-nb.ovsschema
+//go:generate modelgen -p model -o . db.ovsschema
