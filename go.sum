@@ -31,6 +31,8 @@ github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N
 github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6HuIJcUGPhkA7kY=
 github.com/ovn-org/libovsdb v0.4.0 h1:sO37deV5Lhzz87qLLOvub5bHDXG2BoYaqH9cjtcjXLY=
 github.com/ovn-org/libovsdb v0.4.0/go.mod h1:e4Le0OKpNDsiuNOhkYjdB5JKWpVQjJCUYZRl3uYdEfw=
+github.com/ovn-org/libovsdb v0.4.1-0.20210616211123-018874490ec7 h1:uaMwK/30QytTV4iLXO09Y8Ek0v2Le0dfH/pYXRjkPrU=
+github.com/ovn-org/libovsdb v0.4.1-0.20210616211123-018874490ec7/go.mod h1:e4Le0OKpNDsiuNOhkYjdB5JKWpVQjJCUYZRl3uYdEfw=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=

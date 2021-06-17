@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kylelemons/godebug/diff"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/ovn-org/libovsdb/client"
 	"github.com/ovn-org/libovsdb/model"
@@ -19,9 +20,9 @@ import (
 type eventType string
 
 const (
-	updateEvent eventType = "update"
-	addEvent    eventType = "add"
-	deleteEvent eventType = "delete"
+	updateEvent eventType = "UPDATE"
+	addEvent    eventType = "ADD"
+	deleteEvent eventType = "DELETE"
 )
 
 type OvnEvent struct {
@@ -47,14 +48,14 @@ func (s *OvnShell) Monitor(monitor bool) {
 }
 
 func (s *OvnShell) printEvent(event OvnEvent) {
-	fmt.Printf("New %s event on table %s\n", event.Event, event.Table)
+	fmt.Printf("New \033[1m%s\033[0m event on table: \033[1m%s\033[0m\n", event.Event, event.Table)
 	switch event.Event {
 	case updateEvent:
-		fmt.Printf("%s\n", pretty.Compare(event.Old, event.New))
+		fmt.Println(colordiff(event.Old, event.New))
 	case addEvent:
-		pretty.Print(event.New)
+		fmt.Printf("\x1b[32m%s\x1b[0m\n", pretty.CompareConfig.Sprint(event.New))
 	case deleteEvent:
-		pretty.Print(event.Old)
+		fmt.Printf("\x1b[31m%s\x1b[0m\n", pretty.CompareConfig.Sprint(event.Old))
 	}
 	fmt.Print("\n")
 }
@@ -122,6 +123,9 @@ func (s *OvnShell) Run(ovs *client.OvsdbClient, args ...string) {
 		panic(err)
 	}
 	shell := ishell.New()
+	if shell == nil {
+		panic("Failed to create shell")
+	}
 	shell.Set("ovnShell", s)
 
 	shell.Println("OVN Monitoring Shell")
@@ -267,4 +271,25 @@ func newOvnShell(auto bool, dbmodel *model.DBModel) *OvnShell {
 		monitor: auto,
 		dbModel: dbmodel,
 	}
+}
+
+// colordiff is similar to what pretty.compare does but with colors
+func colordiff(a, b interface{}) string {
+	config := pretty.CompareConfig
+	alines := strings.Split(config.Sprint(a), "\n")
+	blines := strings.Split(config.Sprint(b), "\n")
+
+	buf := new(strings.Builder)
+	for _, c := range diff.DiffChunks(alines, blines) {
+		for _, line := range c.Added {
+			fmt.Fprintf(buf, "\x1b[32m+%s\x1b[0m\n", line)
+		}
+		for _, line := range c.Deleted {
+			fmt.Fprintf(buf, "\x1b[31m-%s\x1b[0m\n", line)
+		}
+		for _, line := range c.Equal {
+			fmt.Fprintf(buf, " %s\n", line)
+		}
+	}
+	return strings.TrimRight(buf.String(), "\n")
 }
