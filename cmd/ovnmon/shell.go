@@ -129,7 +129,7 @@ func (s *OvnShell) Run(ovs *client.OvsdbClient, args ...string) {
 		Name: "start",
 		Help: "Start monitoring activity of the OVN DB",
 		Func: func(c *ishell.Context) {
-			ovnShell := c.Get("ovnnShell")
+			ovnShell := c.Get("ovnShell")
 			if ovnShell == nil {
 				c.Println("Error: No context")
 			}
