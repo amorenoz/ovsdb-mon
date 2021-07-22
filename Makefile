@@ -9,6 +9,9 @@ SCHEMA?=schemas/ovn-nb.ovsschema
 all: build
 
 $(MODEL_GEN):
+ifeq ($(GOPATH),)
+	$(error GOPATH is not set)
+endif
 	@go install github.com/ovn-org/libovsdb/cmd/modelgen
 
 .PHONY: build
