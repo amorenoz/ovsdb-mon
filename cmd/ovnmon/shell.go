@@ -261,8 +261,9 @@ func (s *OvnShell) Run(ovs *client.OvsdbClient, args ...string) {
 		if err := shell.Process(args...); err != nil {
 			panic(err)
 		}
+	} else {
+		shell.Run()
 	}
-	shell.Run()
 }
 
 func newOvnShell(auto bool, dbmodel *model.DBModel) *OvnShell {
