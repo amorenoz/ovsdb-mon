@@ -49,10 +49,14 @@ func main() {
 	}
 
 	shell := newOvnShell(*auto, dbModel)
-	ovs, err := client.Connect(context.Background(), dbModel, client.WithEndpoint(addr))
+	c, err := client.NewOVSDBClient(dbModel, client.WithEndpoint(addr))
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer ovs.Disconnect()
-	shell.Run(ovs, flag.Args()...)
+	err = c.Connect(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer c.Disconnect()
+	shell.Run(&c, flag.Args()...)
 }
