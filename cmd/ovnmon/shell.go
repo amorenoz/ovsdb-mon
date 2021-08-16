@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -36,7 +37,7 @@ type OvnEvent struct {
 type OvnShell struct {
 	mutex   *sync.RWMutex
 	monitor bool
-	ovs     *client.OvsdbClient
+	ovs     *client.Client
 	dbModel *model.DBModel
 	events  []OvnEvent
 }
@@ -116,10 +117,14 @@ func (s *OvnShell) Save(filePath string) error {
 	return ioutil.WriteFile(filePath, content, 0644)
 }
 
-func (s *OvnShell) Run(ovs *client.OvsdbClient, args ...string) {
-	s.ovs = ovs
-	ovs.Cache.AddEventHandler(s)
-	if err := ovs.MonitorAll(""); err != nil {
+func (s *OvnShell) Run(ovsPtr *client.Client, args ...string) {
+	s.ovs = ovsPtr
+	if ovsPtr == nil {
+		panic("Failed to de-reference ovs client")
+	}
+	ovs := *ovsPtr
+	ovs.Cache().AddEventHandler(s)
+	if _, err := ovs.MonitorAll(context.Background()); err != nil {
 		panic(err)
 	}
 	shell := ishell.New()
@@ -181,8 +186,13 @@ func (s *OvnShell) Run(ovs *client.OvsdbClient, args ...string) {
 			c.Println("Available Tables")
 			c.Println("----------------")
 
-			for name := range ovnShell.(*OvnShell).ovs.Schema.Tables {
-				c.Println(name)
+			ovsPtr := ovnShell.(*OvnShell).ovs
+			if ovsPtr != nil {
+				for name := range (*ovsPtr).Schema().Tables {
+					c.Println(name)
+				}
+			} else {
+				c.Println("None: no ovs client")
 			}
 		},
 	})
@@ -230,8 +240,12 @@ func (s *OvnShell) Run(ovs *client.OvsdbClient, args ...string) {
 				}
 
 				valueList := reflect.New(reflect.SliceOf(mtype.Elem()))
-				ovs := ovnShell.(*OvnShell).ovs
-				err = ovs.List(valueList.Interface())
+				ovsPtr := ovnShell.(*OvnShell).ovs
+				if ovsPtr == nil {
+					c.Println("No ovs client")
+					return
+				}
+				err = (*ovsPtr).List(valueList.Interface())
 				if err != nil && err != client.ErrNotFound {
 					c.Println(err)
 					return
