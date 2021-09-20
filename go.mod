@@ -1,4 +1,4 @@
-module github.com/amorenoz/ovnmon
+module github.com/amorenoz/ovsdb-mon
 
 go 1.15
 
