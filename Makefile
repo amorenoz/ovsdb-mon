@@ -1,4 +1,4 @@
-BINARY_NAME=ovnmon
+BINARY_NAME=ovsdb-mon
 BINARY_MOD=./cmd/$(BINARY_NAME)
 MODEL_GEN=$(GOPATH)/bin/modelgen
 MODEL_PATH=model

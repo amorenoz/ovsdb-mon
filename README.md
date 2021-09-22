@@ -1,10 +1,11 @@
-# ovnmon
+# ovsdb-mon
 
-ovnmon is a OVN monitoring and visulization tool based on [libovsdb](https://github.com/ovn-org/libovsdb)
+ovsdb-mon is an OVSDB monitoring and visulization tool based on [libovsdb](https://github.com/ovn-org/libovsdb)
 
-### Building ovnmon
-By default, ovnmon uses the schema defined in *schemas/ovn-nb.ovsschema*. If you want to use your own,
-simply download it from your ovsdb server and replace the existing one
+### Building ovsdb-mon
+A common usage for this tool is to monitor an OVN database. However, it is generic enough to be used with
+any OVSDB schema. By default, ovsdb-mon uses the schema defined in *schemas/ovn-nb.ovsschema*. If you want to
+use your own, simply download it from your ovsdb server and replace the existing one
 
      ovsdb-client get-schema ${SERVER} ${DATABASE} > schemas/my.ovsschema
 
@@ -12,12 +13,12 @@ Then, just build the program specifying a schema file
 
      make SCHEMA=schemas/my.ovsschema
 
-This will use modelgen to generate a native model of the DB and use it to build ovnmon
+This will use modelgen to generate a native model of the DB and use it to build ovsdb-mon
 
-### Using ovnmon
-Usage of ovnmon:
+### Using ovsdb-mon
+Usage of ovsdb-mon:
 
-	./bin/ovnmon [FLAGS] [COMMAND]
+	./bin/ovsdb-mon [FLAGS] [COMMAND]
 	FLAGS:
 	  -auto
 	        Autostart: If set to true, it will start monitoring from the begining
@@ -30,7 +31,7 @@ Usage of ovnmon:
 
 By default it will open an interactive terminal where you can monitor the activity of the DB and inspect it:
 
-	./bin/ovnmon  --db tcp:172.19.0.4:6641
+	./bin/ovsdb-mon  --db tcp:172.19.0.4:6641
 	OVN Monitoring Shell
 	>>> help
 	Commands:
