@@ -59,8 +59,8 @@ github.com/opencontainers/go-digest v1.0.0-rc1/go.mod h1:cMLVZDEM3+U2I4VmLI6N8jQ
 github.com/opencontainers/image-spec v1.0.1/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zMzWCbyJoFRP3s7yZA0=
 github.com/opencontainers/runc v1.0.0-rc9/go.mod h1:qT5XzbpPznkRYVz/mWwUaVBUv2rmF59PVA73FjuZG0U=
 github.com/ory/dockertest/v3 v3.7.0/go.mod h1:PvCCgnP7AfBZeVrzwiUTjZx/IUXlGLC1zQlUQrLIlUE=
-github.com/ovn-org/libovsdb v0.6.1-0.20210803142447-94fe2cdc514e h1:qlUkF5zLGDhOiwYMzdFOZAZqGhbXRVMihQhGuLufg/s=
-github.com/ovn-org/libovsdb v0.6.1-0.20210803142447-94fe2cdc514e/go.mod h1:z8nnwUG5G+D4bzoUm6qbg5fC4q9pphb5VwO0AS473Ks=
+github.com/ovn-org/libovsdb v0.6.1-0.20210920174042-03e0010e3257 h1:lKyffjAmGApHFZv5h2xB3pCmBK1UOnBSHX3329IGWYc=
+github.com/ovn-org/libovsdb v0.6.1-0.20210920174042-03e0010e3257/go.mod h1:z8nnwUG5G+D4bzoUm6qbg5fC4q9pphb5VwO0AS473Ks=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
