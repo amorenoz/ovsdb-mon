@@ -4,8 +4,13 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
+	"strings"
 
 	"github.com/olekukonko/tablewriter"
+	"github.com/ovn-org/libovsdb/client"
+	"github.com/ovn-org/libovsdb/model"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // StructPrinter is a wrapper around tablewriter that
@@ -76,4 +81,68 @@ func NewStructPrinter(writer io.Writer, stype reflect.Type, fieldSel ...string) 
 		cols:  cols,
 		table: table,
 	}, nil
+}
+
+func getTablesToMonitor(dbModel *model.DBModel, monitorTables string, noMonitorTables string) ([]client.TableMonitor, error) {
+	prettyTableNames := func() string {
+		tableNames := make([]string, 0, len(dbModel.Types()))
+		for tableName := range dbModel.Types() {
+			tableNames = append(tableNames, tableName)
+		}
+		sort.Strings(tableNames)
+		return strings.Join(tableNames, ", ")
+	}
+
+	// TODO (flaviof): as a follow-up feature, we could allow the caller to specify what fields of the
+	// provided table(s) we would like to monitor on. That would give us even more control over what
+	// notification we get. I'm thinking something along the lines: table1:field1:field2,table2,table3:name
+
+	// Prepare a map with lower caps of tables for easy lookup
+	tables := map[string]string{}
+	for table := range dbModel.Types() {
+		tables[strings.ToLower(table)] = table
+	}
+
+	// Assemble tables to be monitored
+	tablesWanted := sets.String{}
+	if monitorTables == "" {
+		for _, table := range tables {
+			tablesWanted.Insert(table)
+		}
+	} else {
+		for _, currMonitorTable := range strings.Split(monitorTables, ",") {
+			if currMonitorTable == "" {
+				continue
+			}
+			table, exists := tables[strings.ToLower(currMonitorTable)]
+			if !exists {
+				return nil, fmt.Errorf("table '%s' is unknown. Available tables are: %s", currMonitorTable, prettyTableNames())
+			}
+			tablesWanted.Insert(table)
+		}
+	}
+
+	// Remove anything mentioned in noMonitorTables
+	for _, currNoMonitorTable := range strings.Split(noMonitorTables, ",") {
+		if currNoMonitorTable == "" {
+			continue
+		}
+		table, exists := tables[strings.ToLower(currNoMonitorTable)]
+		if !exists {
+			return nil, fmt.Errorf("table '%s' is unknown. Available tables are: %s", currNoMonitorTable, prettyTableNames())
+		}
+		tablesWanted.Delete(table)
+	}
+
+	if len(tablesWanted) == 0 {
+		return nil, fmt.Errorf("no tables to monitor, that is kinda sad")
+	}
+
+	tablesToMonitor := make([]client.TableMonitor, 0, len(tablesWanted))
+	for table := range tablesWanted {
+		tableMonitor := client.TableMonitor{Table: table}
+		tablesToMonitor = append(tablesToMonitor, tableMonitor)
+	}
+
+	return tablesToMonitor, nil
 }

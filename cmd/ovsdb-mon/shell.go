@@ -35,11 +35,12 @@ type OvnEvent struct {
 }
 
 type OvnShell struct {
-	mutex   *sync.RWMutex
-	monitor bool
-	ovs     *client.Client
-	dbModel *model.DBModel
-	events  []OvnEvent
+	mutex           *sync.RWMutex
+	monitor         bool
+	ovs             *client.Client
+	dbModel         *model.DBModel
+	events          []OvnEvent
+	tablesToMonitor []client.TableMonitor
 }
 
 func (s *OvnShell) Monitor(monitor bool) {
@@ -124,9 +125,12 @@ func (s *OvnShell) Run(ovsPtr *client.Client, args ...string) {
 	}
 	ovs := *ovsPtr
 	ovs.Cache().AddEventHandler(s)
-	if _, err := ovs.MonitorAll(context.Background()); err != nil {
+
+	// if _, err := ovs.MonitorAll(context.Background()); err != nil {
+	if _, err := ovs.Monitor(context.Background(), s.tablesToMonitor...); err != nil {
 		panic(err)
 	}
+
 	shell := ishell.New()
 	if shell == nil {
 		panic("Failed to create shell")
@@ -280,11 +284,12 @@ func (s *OvnShell) Run(ovsPtr *client.Client, args ...string) {
 	}
 }
 
-func newOvnShell(auto bool, dbmodel *model.DBModel) *OvnShell {
+func newOvnShell(auto bool, dbmodel *model.DBModel, tablesToMonitor []client.TableMonitor) *OvnShell {
 	return &OvnShell{
-		mutex:   new(sync.RWMutex),
-		monitor: auto,
-		dbModel: dbmodel,
+		mutex:           new(sync.RWMutex),
+		monitor:         auto,
+		dbModel:         dbmodel,
+		tablesToMonitor: tablesToMonitor,
 	}
 }
 

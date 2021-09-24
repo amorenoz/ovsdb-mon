@@ -13,4 +13,5 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/ovn-org/libovsdb v0.6.1-0.20210920174042-03e0010e3257
 	gopkg.in/abiosoft/ishell.v2 v2.0.0
+	k8s.io/apimachinery v0.22.2
 )

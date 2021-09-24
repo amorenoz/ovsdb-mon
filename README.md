@@ -24,6 +24,10 @@ Usage of ovsdb-mon:
 	        Autostart: If set to true, it will start monitoring from the begining
 	  -db string
 	        Database connection. Default: unix:/${OVS_RUNDIR}/ovnnb_db.sock
+	  -monitor string
+	        Only monitor these comma-separated tables
+	  -no-monitor string
+	        Do not monitor these comma-separated tables
 	COMMAND:
 	        If provided, it will run the command and exit. If not, it will enter interactive mode
 	        For a full description of available commands use the command 'help'

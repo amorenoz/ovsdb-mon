@@ -17,8 +17,10 @@ const (
 )
 
 var (
-	db   = flag.String("db", "", "Database connection. Default: unix:/${OVS_RUNDIR}/ovnnb_db.sock")
-	auto = flag.Bool("auto", false, "Autostart: If set to true, it will start monitoring from the beginning")
+	db              = flag.String("db", "", "Database connection. Default: unix:/${OVS_RUNDIR}/ovnnb_db.sock")
+	auto            = flag.Bool("auto", false, "Autostart: If set to true, it will start monitoring from the beginning")
+	monitorTables   = flag.String("monitor", "", "Only monitor these comma-separated tables")
+	noMonitorTables = flag.String("no-monitor", "", "Do not monitor these comma-separated tables")
 )
 
 func main() {
@@ -48,7 +50,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	shell := newOvnShell(*auto, dbModel)
+	tablesToMonitor, err := getTablesToMonitor(dbModel, *monitorTables, *noMonitorTables)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	shell := newOvnShell(*auto, dbModel, tablesToMonitor)
 	c, err := client.NewOVSDBClient(dbModel, client.WithEndpoint(addr))
 	if err != nil {
 		log.Fatal(err)
