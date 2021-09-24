@@ -55,7 +55,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	shell := newOvnShell(*auto, dbModel, tablesToMonitor)
+	shell := newOvsdbShell(*auto, dbModel, tablesToMonitor)
 	c, err := client.NewOVSDBClient(dbModel, client.WithEndpoint(addr))
 	if err != nil {
 		log.Fatal(err)

@@ -24,9 +24,11 @@ const (
 	updateEvent eventType = "UPDATE"
 	addEvent    eventType = "ADD"
 	deleteEvent eventType = "DELETE"
+
+	sname = "ovsdbShell"
 )
 
-type OvnEvent struct {
+type OvsdbEvent struct {
 	Timestamp time.Time
 	Event     eventType
 	Table     string
@@ -34,22 +36,22 @@ type OvnEvent struct {
 	New       model.Model
 }
 
-type OvnShell struct {
+type OvsdbShell struct {
 	mutex           *sync.RWMutex
 	monitor         bool
 	ovs             *client.Client
 	dbModel         *model.DBModel
-	events          []OvnEvent
+	events          []OvsdbEvent
 	tablesToMonitor []client.TableMonitor
 }
 
-func (s *OvnShell) Monitor(monitor bool) {
+func (s *OvsdbShell) Monitor(monitor bool) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.monitor = monitor
 }
 
-func (s *OvnShell) printEvent(event OvnEvent) {
+func (s *OvsdbShell) printEvent(event OvsdbEvent) {
 	fmt.Printf("New \033[1m%s\033[0m event on table: \033[1m%s\033[0m\n", event.Event, event.Table)
 	switch event.Event {
 	case updateEvent:
@@ -62,11 +64,11 @@ func (s *OvnShell) printEvent(event OvnEvent) {
 	fmt.Print("\n")
 }
 
-func (s *OvnShell) OnAdd(table string, m model.Model) {
+func (s *OvsdbShell) OnAdd(table string, m model.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	if s.monitor {
-		event := OvnEvent{
+		event := OvsdbEvent{
 			Timestamp: time.Now(),
 			Event:     addEvent,
 			Table:     table,
@@ -77,11 +79,11 @@ func (s *OvnShell) OnAdd(table string, m model.Model) {
 	}
 }
 
-func (s *OvnShell) OnUpdate(table string, old, new model.Model) {
+func (s *OvsdbShell) OnUpdate(table string, old, new model.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	if s.monitor {
-		event := OvnEvent{
+		event := OvsdbEvent{
 			Timestamp: time.Now(),
 			Event:     updateEvent,
 			Table:     table,
@@ -93,11 +95,11 @@ func (s *OvnShell) OnUpdate(table string, old, new model.Model) {
 	}
 }
 
-func (s *OvnShell) OnDelete(table string, m model.Model) {
+func (s *OvsdbShell) OnDelete(table string, m model.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	if s.monitor {
-		event := OvnEvent{
+		event := OvsdbEvent{
 			Timestamp: time.Now(),
 			Event:     deleteEvent,
 			Table:     table,
@@ -108,7 +110,7 @@ func (s *OvnShell) OnDelete(table string, m model.Model) {
 	}
 }
 
-func (s *OvnShell) Save(filePath string) error {
+func (s *OvsdbShell) Save(filePath string) error {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	content, err := json.MarshalIndent(s.events, "", "    ")
@@ -118,7 +120,7 @@ func (s *OvnShell) Save(filePath string) error {
 	return ioutil.WriteFile(filePath, content, 0644)
 }
 
-func (s *OvnShell) Run(ovsPtr *client.Client, args ...string) {
+func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 	s.ovs = ovsPtr
 	if ovsPtr == nil {
 		panic("Failed to de-reference ovs client")
@@ -135,42 +137,42 @@ func (s *OvnShell) Run(ovsPtr *client.Client, args ...string) {
 	if shell == nil {
 		panic("Failed to create shell")
 	}
-	shell.Set("ovnShell", s)
+	shell.Set(sname, s)
 
-	shell.Println("OVN Monitoring Shell")
+	shell.Println("OVSDB Monitoring Shell")
 	shell.AddCmd(&ishell.Cmd{
 		Name: "start",
-		Help: "Start monitoring activity of the OVN DB",
+		Help: "Start monitoring activity of the OVSDB DB",
 		Func: func(c *ishell.Context) {
-			ovnShell := c.Get("ovnShell")
-			if ovnShell == nil {
+			ovsdbShell := c.Get(sname)
+			if ovsdbShell == nil {
 				c.Println("Error: No context")
 			}
-			ovnShell.(*OvnShell).Monitor(true)
+			ovsdbShell.(*OvsdbShell).Monitor(true)
 		},
 	})
 	shell.AddCmd(&ishell.Cmd{
 		Name: "stop",
-		Help: "Stop monitoring activity of the OVN DB",
+		Help: "Stop monitoring activity of the OVSDB DB",
 		Func: func(c *ishell.Context) {
-			ovnShell := c.Get("ovnShell")
-			if ovnShell == nil {
+			ovsdbShell := c.Get(sname)
+			if ovsdbShell == nil {
 				c.Println("Error: No context")
 			}
-			ovnShell.(*OvnShell).Monitor(false)
+			ovsdbShell.(*OvsdbShell).Monitor(false)
 		},
 	})
 	shell.AddCmd(&ishell.Cmd{
 		Name: "save",
 		Help: "Save events",
 		Func: func(c *ishell.Context) {
-			ovnShell := c.Get("ovnShell")
+			ovsdbShell := c.Get(sname)
 			if len(c.Args) != 1 {
 				c.Println("Usage: save <path>")
 				return
 			}
 			filePath := c.Args[0]
-			if err := ovnShell.(*OvnShell).Save(filePath); err != nil {
+			if err := ovsdbShell.(*OvsdbShell).Save(filePath); err != nil {
 				c.Println(err)
 			} else {
 				c.Println("File saved")
@@ -183,14 +185,14 @@ func (s *OvnShell) Run(ovsPtr *client.Client, args ...string) {
 		Name: "show",
 		Help: "Print available tables",
 		Func: func(c *ishell.Context) {
-			ovnShell := c.Get("ovnShell")
-			if ovnShell == nil {
+			ovsdbShell := c.Get(sname)
+			if ovsdbShell == nil {
 				c.Println("Error: No context")
 			}
 			c.Println("Available Tables")
 			c.Println("----------------")
 
-			ovsPtr := ovnShell.(*OvnShell).ovs
+			ovsPtr := ovsdbShell.(*OvsdbShell).ovs
 			if ovsPtr != nil {
 				for name := range (*ovsPtr).Schema().Tables {
 					c.Println(name)
@@ -230,13 +232,13 @@ func (s *OvnShell) Run(ovsPtr *client.Client, args ...string) {
 				"\n\t[Field1 Field2 ...]: List of fields to show (default: all fields will be shown)" +
 				fmt.Sprintf("\n\t\tPossible Fields: %s", strings.Join(tableFields[name], ", ")),
 			Func: func(c *ishell.Context) {
-				ovnShell := c.Get("ovnShell")
-				if ovnShell == nil {
+				ovsdbShell := c.Get(sname)
+				if ovsdbShell == nil {
 					c.Println("Error: No context")
 				}
 				// Use a buffer to store the generated output table
 				buffer := bytes.Buffer{}
-				mtype := ovnShell.(*OvnShell).dbModel.Types()[c.Cmd.Name]
+				mtype := ovsdbShell.(*OvsdbShell).dbModel.Types()[c.Cmd.Name]
 				printer, err := NewStructPrinter(&buffer, mtype.Elem(), c.Args...)
 				if err != nil {
 					c.Println(err)
@@ -244,7 +246,7 @@ func (s *OvnShell) Run(ovsPtr *client.Client, args ...string) {
 				}
 
 				valueList := reflect.New(reflect.SliceOf(mtype.Elem()))
-				ovsPtr := ovnShell.(*OvnShell).ovs
+				ovsPtr := ovsdbShell.(*OvsdbShell).ovs
 				if ovsPtr == nil {
 					c.Println("No ovs client")
 					return
@@ -284,8 +286,8 @@ func (s *OvnShell) Run(ovsPtr *client.Client, args ...string) {
 	}
 }
 
-func newOvnShell(auto bool, dbmodel *model.DBModel, tablesToMonitor []client.TableMonitor) *OvnShell {
-	return &OvnShell{
+func newOvsdbShell(auto bool, dbmodel *model.DBModel, tablesToMonitor []client.TableMonitor) *OvsdbShell {
+	return &OvsdbShell{
 		mutex:           new(sync.RWMutex),
 		monitor:         auto,
 		dbModel:         dbmodel,
