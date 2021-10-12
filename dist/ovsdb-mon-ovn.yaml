@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ovsdb-mon-ovn
+spec:
+  containers:
+  - name: ovsdb-mon-ovn
+    image: quay.io/amorenoz/ovsdb-mon:latest
+    resources:
+      requests:
+        memory: "64Mi"
+      limits:
+        memory: "256Mi"
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+    - mountPath: /run/ovn/
+      name: run-ovn
+    - mountPath: /run/openvswitch/
+      name: run-ovs
+    readinessProbe:
+      exec:
+        command:
+        - ls
+        - /tmp/build_finished
+      initialDelaySeconds: 5
+  volumes:
+  - hostPath:
+      path: /run/ovn
+      type: ""
+    name: run-ovn
+  - hostPath:
+      path: /run/openvswitch
+      type: ""
+    name: run-ovs
+  tolerations:
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+  hostNetwork: true
+  nodeSelector:
+    node-role.kubernetes.io/master: ""
