@@ -36,6 +36,9 @@ func (sp *StructPrinter) Append(objList interface{}) error {
 			if !field.IsValid() {
 				continue
 			}
+			if field.Type().Kind() == reflect.Ptr && !field.IsNil() {
+				field = field.Elem()
+			}
 			objData = append(objData, fmt.Sprintf("%v", field.Interface()))
 		}
 		data = append(data, objData)
