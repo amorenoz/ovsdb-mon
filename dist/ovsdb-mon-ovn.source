@@ -1,0 +1,21 @@
+if [ "${BASH_SOURCE[0]}" -ef "$0" ]
+then
+    >&2 echo 'Please source this script, not execute it!'
+    exit 1
+fi
+
+kubectl apply -f ./ovsdb-mon-ovn.yaml || { >&2 echo 'bad k8s?'; return; }
+
+echo waiting for pod to become ready...
+kubectl wait --for=condition=ready pod/ovsdb-mon-ovn \
+    --timeout=300s || { >&2 echo 'failed: error pod not ready' ; return; }
+
+alias ovsdb-mon.nb='kubectl exec -it ovsdb-mon-ovn -- ovsdb-mon.OVN_Northbound'
+alias ovsdb-mon.sb='kubectl exec -it ovsdb-mon-ovn -- ovsdb-mon.OVN_Southbound --db unix:/run/ovn/ovnsb_db.sock'
+
+echo 'to remove pod created, do: kubectl delete pod/ovsdb-mon-ovn'
+echo 'commands to try:'
+echo '   ovsdb-mon.nb -auto -no-monitor nb_global,connection'
+echo '   ovsdb-mon.sb -auto -monitor Logical_Flow'
+echo '   ovsdb-mon.sb list Chassis Hostname'
+echo

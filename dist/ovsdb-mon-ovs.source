@@ -1,0 +1,32 @@
+if [ "${BASH_SOURCE[0]}" -ef "$0" ]
+then
+    >&2 echo 'Please source this script, not execute it!'
+    exit 1
+fi
+
+kubectl apply -f ./ovsdb-mon-ds.yaml || { >&2 echo 'bad k8s?'; return; }
+
+# create handy aliases for easy usage of ovsdb-mon.ovs
+DS='ovsdb-mon-ovs'
+POD_TUPLES=$(
+kubectl get pod  \
+  -o jsonpath='{range .items[*]}{.spec.nodeName}{"/"}{.metadata.name}{" "}{end}' | grep ${DS} )
+
+set -y 2>/dev/null ||:  ; # this is for the zsh users out there
+
+for POD_TUPLE in $POD_TUPLES ; do \
+   NODE=$(echo $POD_TUPLE | cut -d/ -f1)
+   POD=$(echo $POD_TUPLE | cut -d/ -f2)
+   echo $NODE has pod ${POD} . Creating alias ovsdb-mon.ovs.$NODE
+   alias ovsdb-mon.ovs.$NODE="kubectl exec -it $POD -- ovsdb-mon.Open_vSwitch -db unix:/run/ovn/db.sock"
+done
+
+echo
+kubectl get ds ${DS}
+echo
+echo "to remove daemonset created, do: kubectl delete ds ${DS}"
+echo 'commands to try (after pod becomes ready):'
+echo "   ovsdb-mon.ovs.${NODE} list Interface Name Ofport ExternalIDs"
+echo "   kubectl exec -it ${POD} -- ovs-vsctl show"
+echo "   kubectl exec -it ${POD} -- sudo ovs-ofctl --names dump-flows br-int table=0 | cut -d',' -f3-"
+echo

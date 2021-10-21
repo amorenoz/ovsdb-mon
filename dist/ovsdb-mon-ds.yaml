@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ovsdb-mon-ovs
+spec:
+  selector:
+    matchLabels:
+      name: ovsdb-mon-ovs
+  template:
+    metadata:
+      labels:
+        name: ovsdb-mon-ovs
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: ovsdb-mon
+          image: quay.io/amorenoz/ovsdb-mon:latest
+          resources:
+            requests:
+              memory: "64Mi"
+            limits:
+              memory: "256Mi"
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - mountPath: /run/ovn/
+              name: run-ovn
+            - mountPath: /run/openvswitch/
+              name: run-ovs
+          readinessProbe:
+            exec:
+              command:
+              - ls
+              - /tmp/build_finished
+            initialDelaySeconds: 5
+      volumes:
+        - hostPath:
+            path: /run/ovn
+            type: ""
+          name: run-ovn
+        - hostPath:
+            path: /run/openvswitch
+            type: ""
+          name: run-ovs
+      hostNetwork: true

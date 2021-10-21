@@ -53,3 +53,13 @@ The result looks like this:
 
 ![Demo](doc/images/demo.gif)
 
+### Kubernetes
+
+Use the yaml and scripts provided in the dist folder in order to deploy pods that
+provide a ready to use binary for the K8 cluster.
+
+	[ -n ${KUBECONFIG} ] || echo Make sure kubectl command can reach the cluster
+    cd dist
+    source ./ovsdb-mon-ovn.source
+    source ./ovsdb-mon-ovs.source
+
