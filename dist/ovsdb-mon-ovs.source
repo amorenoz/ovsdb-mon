@@ -18,7 +18,7 @@ for POD_TUPLE in $POD_TUPLES ; do \
    NODE=$(echo $POD_TUPLE | cut -d/ -f1)
    POD=$(echo $POD_TUPLE | cut -d/ -f2)
    echo $NODE has pod ${POD} . Creating alias ovsdb-mon.ovs.$NODE
-   alias ovsdb-mon.ovs.$NODE="kubectl exec -it $POD -- ovsdb-mon.Open_vSwitch -db unix:/run/ovn/db.sock"
+   alias ovsdb-mon.ovs.$NODE="kubectl exec -it $POD -- ovsdb-mon.Open_vSwitch"
 done
 
 echo
