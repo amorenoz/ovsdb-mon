@@ -63,3 +63,33 @@ provide a ready to use binary for the K8 cluster.
     source ./ovsdb-mon-ovn.source
     source ./ovsdb-mon-ovs.source
 
+
+### Local machine (e.g: Openstack node)
+
+If there is an OVN control plane or OVS running locally, run the following command
+to spin up the container:
+
+For OVN and OVS (e.g: controller):
+
+    $ podman run --detach --name ovsdb-flowmon --rm --network=host -v /var/lib/openvswitch/ovn:/var/lib/openvswitch/ovn -v /var/run/openvswitch:/var/run/openvswitch quay.io/amorenoz/ovsdb-mon:latest
+
+For OVS-only (e.g: compute):
+
+    $ podman run --detach --name ovsdb-flowmon --rm --network=host -v /var/run/openvswitch:/var/run/openvswitch quay.io/amorenoz/ovsdb-mon:latest
+
+*Note*: The paths where OVS and OVN socket files are placed might be different in your distro. The container will try some common places but if it doesn't work for you, please raise an Issue.
+
+To start monitoring run:
+
+OVN_NorthBound:
+
+    $ podman exec -it ovsdb-mon ovsdb-mon.OVN_Northbound
+
+OVN_SouthBound:
+
+    $ podman exec -it ovsdb-mon ovsdb-mon.OVN_Southbound
+
+OVS:
+
+    $ podman exec -it ovsdb-mon ovsdb-mon.Open_vSwitch
+
