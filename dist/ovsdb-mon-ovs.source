@@ -28,5 +28,5 @@ echo "to remove daemonset created, do: kubectl delete ds ${DS}"
 echo 'commands to try (after pod becomes ready):'
 echo "   ovsdb-mon.ovs.${NODE} list Interface Name Ofport ExternalIDs"
 echo "   kubectl exec -it ${POD} -- ovs-vsctl show"
-echo "   kubectl exec -it ${POD} -- sudo ovs-ofctl --names dump-flows br-int table=0 | cut -d',' -f3-"
+echo "   kubectl exec -it ${POD} -- ovs-ofctl --names dump-flows br-int table=0 | cut -d',' -f3-"
 echo
