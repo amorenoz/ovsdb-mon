@@ -210,27 +210,33 @@ func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 		Help: "List the content of a specific table",
 	}
 
-	// To generate the completer for each subcommand we store all the possible fields per table
-	tableFields := make(map[string][]string)
+	// Generate the list of columns for each table to be used as command auto-completion options
+	exactTableFields := make(map[string][]string) // holds exact names
+	allTableFields := make(map[string][]string)   // holds exact names and lower case versions
 	for tname, mtype := range s.dbModel.Types() {
-		fields := []string{}
+		exactFields := []string{}
+		allFields := []string{}
 		for i := 0; i < mtype.Elem().NumField(); i++ {
-			fields = append(fields, mtype.Elem().Field(i).Name)
+			exactFields = append(exactFields, mtype.Elem().Field(i).Name)
+			allFields = append(allFields, mtype.Elem().Field(i).Name)
+			allFields = append(allFields, strings.ToLower(mtype.Elem().Field(i).Name))
 		}
-		tableFields[tname] = fields
+		allTableFields[tname] = allFields
+		exactTableFields[tname] = exactFields
 	}
 
 	for name := range s.dbModel.Types() {
 		// Trick to be able to use name inside closures
 		tableName := name
 		subTableCmd := ishell.Cmd{
-			Name: name,
-			Help: fmt.Sprintf("%s [Field1 Field2 ...]", name),
+			Name:    name,
+			Aliases: []string{strings.ToLower(name)},
+			Help:    fmt.Sprintf("%s [Field1 Field2 ...]", name),
 			LongHelp: fmt.Sprintf(
 				"List the content of Table %s", name) +
 				fmt.Sprintf("\n\n%s [Field1 Field2 ...]", name) +
 				"\n\t[Field1 Field2 ...]: List of fields to show (default: all fields will be shown)" +
-				fmt.Sprintf("\n\t\tPossible Fields: %s", strings.Join(tableFields[name], ", ")),
+				fmt.Sprintf("\n\t\tPossible Fields: %s", strings.Join(exactTableFields[name], ", ")),
 			Func: func(c *ishell.Context) {
 				ovsdbShell := c.Get(sname)
 				if ovsdbShell == nil {
@@ -268,11 +274,28 @@ func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 					panic(err)
 				}
 			},
-			Completer: func(args []string) []string {
-				return tableFields[tableName]
+			CompleterWithPrefix: func(prefix string, args []string) []string {
+				if prefix == "" {
+					return exactTableFields[tableName]
+				}
+				return allTableFields[tableName]
 			},
 		}
 		listCmd.AddCmd(&subTableCmd)
+	}
+
+	// The list command autocompleter returns the exact table names if user has not
+	// started typing. If he/she has, then also include aliases (which are lower cased versions
+	// of the table names)
+	listCmd.CompleterWithPrefix = func(prefix string, args []string) []string {
+		options := []string{}
+		for _, cmd := range listCmd.Children() {
+			options = append(options, cmd.Name)
+			if prefix != "" {
+				options = append(options, cmd.Aliases...)
+			}
+		}
+		return options
 	}
 	shell.AddCmd(&listCmd)
 
