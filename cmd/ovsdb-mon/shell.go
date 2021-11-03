@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
+	ishell "github.com/abiosoft/ishell/v2"
 	"github.com/kylelemons/godebug/diff"
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/ovn-org/libovsdb/client"
 	"github.com/ovn-org/libovsdb/model"
-	ishell "gopkg.in/abiosoft/ishell.v2"
 )
 
 type eventType string
