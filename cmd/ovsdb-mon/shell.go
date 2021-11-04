@@ -231,21 +231,43 @@ func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 		subTableCmd := ishell.Cmd{
 			Name:    name,
 			Aliases: []string{strings.ToLower(name)},
-			Help:    fmt.Sprintf("%s [Field1 Field2 ...]", name),
+			Help:    fmt.Sprintf("%s [--filter Field=Value] [Field1 Field2 ...]", name),
 			LongHelp: fmt.Sprintf(
 				"List the content of Table %s", name) +
-				fmt.Sprintf("\n\n%s [Field1 Field2 ...]", name) +
+				fmt.Sprintf("\n\n%s [--filter Field=Value] [Field1 Field2 ...]", name) +
 				"\n\t[Field1 Field2 ...]: List of fields to show (default: all fields will be shown)" +
+				"\n\t[--filter Field=Value]: Apply filter (only fields that are part of the table's index can be specified" +
 				fmt.Sprintf("\n\t\tPossible Fields: %s", strings.Join(exactTableFields[name], ", ")),
 			Func: func(c *ishell.Context) {
 				ovsdbShell := c.Get(sname)
 				if ovsdbShell == nil {
 					c.Println("Error: No context")
 				}
+
+				columns := []string{}
+				var filter string
+				var err error
+				isFilter := false
+				for _, arg := range c.Args {
+					if arg == "--filter" {
+						isFilter = true
+					} else {
+						if isFilter {
+							if filter != "" {
+								c.Println("Only one --filter statement allowed")
+								return
+							}
+							filter = arg
+							isFilter = false
+						} else {
+							columns = append(columns, arg)
+						}
+					}
+				}
 				// Use a buffer to store the generated output table
 				buffer := bytes.Buffer{}
 				mtype := ovsdbShell.(*OvsdbShell).dbModel.Types()[c.Cmd.Name]
-				printer, err := NewStructPrinter(&buffer, mtype.Elem(), c.Args...)
+				printer, err := NewStructPrinter(&buffer, mtype.Elem(), columns...)
 				if err != nil {
 					c.Println(err)
 					return
@@ -257,10 +279,23 @@ func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 					c.Println("No ovs client")
 					return
 				}
-				err = (*ovsPtr).List(valueList.Interface())
-				if err != nil && err != client.ErrNotFound {
-					c.Println(err)
-					return
+				if filter != "" {
+					cond, err := s.filterAPI(tableName, filter)
+					if err != nil {
+						c.Println(err)
+						return
+					}
+					err = cond.List(valueList.Interface())
+					if err != nil && err != client.ErrNotFound {
+						c.Println(err)
+						return
+					}
+				} else {
+					err = (*ovsPtr).List(valueList.Interface())
+					if err != nil && err != client.ErrNotFound {
+						c.Println(err)
+						return
+					}
 				}
 
 				// Render the result table
@@ -337,4 +372,34 @@ func colordiff(a, b interface{}) string {
 		}
 	}
 	return strings.TrimRight(buf.String(), "\n")
+}
+
+// filterAPI returns the conditional API that filters based on the provided filter expression
+// Expression is [FIELD]=[VALUE]
+func (s *OvsdbShell) filterAPI(tableName string, expr string) (client.ConditionalAPI, error) {
+	condModel, err := s.dbModel.NewModel(tableName)
+	if err != nil {
+		return nil, err
+	}
+	parts := strings.Split(expr, "=")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("Invalid filter expression: %s. Use: [FIELD]=[VALUE]", expr)
+	}
+
+	field := parts[0]
+	value := parts[1]
+
+	fieldName, present := s.exactFieldName(tableName, field)
+	if !present {
+		return nil, fmt.Errorf("field %s not present in database table %s", field, tableName)
+	}
+
+	fieldVal := reflect.ValueOf(condModel).Elem().FieldByName(fieldName)
+	if fieldVal.Kind() != reflect.String {
+		return nil, fmt.Errorf("filters only support string values")
+	}
+
+	fieldVal.Set(reflect.ValueOf(value))
+
+	return (*s.ovs).Where(condModel), nil
 }
