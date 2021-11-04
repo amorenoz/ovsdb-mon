@@ -39,7 +39,7 @@ type OvsdbEvent struct {
 type OvsdbShell struct {
 	mutex           *sync.RWMutex
 	monitor         bool
-	ovs             *client.Client
+	ovs             client.Client
 	dbModel         *model.DBModel
 	events          []OvsdbEvent
 	tablesToMonitor []client.TableMonitor
@@ -123,20 +123,16 @@ func (s *OvsdbShell) Save(filePath string) error {
 	return ioutil.WriteFile(filePath, content, 0644)
 }
 
-func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
-	s.ovs = ovsPtr
-	if ovsPtr == nil {
-		panic("Failed to de-reference ovs client")
-	}
-	ovs := *ovsPtr
-	ovs.Cache().AddEventHandler(s)
+func (s *OvsdbShell) Run(ovs client.Client, args ...string) {
+	s.ovs = ovs
+	s.ovs.Cache().AddEventHandler(s)
 
 	// if _, err := ovs.MonitorAll(context.Background()); err != nil {
-	if _, err := ovs.Monitor(context.Background(), s.tablesToMonitor...); err != nil {
+	if _, err := s.ovs.Monitor(context.Background(), s.tablesToMonitor...); err != nil {
 		panic(err)
 	}
 
-	for tableName, tableSchema := range ovs.Schema().Tables {
+	for tableName, tableSchema := range s.ovs.Schema().Tables {
 		indexes := []string{"UUID"}
 		for _, idx := range tableSchema.Indexes {
 			if len(idx) > 1 {
@@ -212,7 +208,7 @@ func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 
 			ovsPtr := ovsdbShell.(*OvsdbShell).ovs
 			if ovsPtr != nil {
-				for name := range (*ovsPtr).Schema().Tables {
+				for name := range s.ovs.Schema().Tables {
 					c.Println(name)
 				}
 			} else {
@@ -247,77 +243,7 @@ func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 				if ovsdbShell == nil {
 					c.Println("Error: No context")
 				}
-
-				columns := []string{}
-				var filter string
-				var err error
-				isFilter := false
-				for _, arg := range c.Args {
-					if arg == "--filter" {
-						isFilter = true
-					} else {
-						if isFilter {
-							if filter != "" {
-								c.Println("Only one --filter statement allowed")
-								return
-							}
-							filter = arg
-							isFilter = false
-						} else {
-							if col, exists := s.exactFieldName(tableName, arg); exists {
-								columns = append(columns, col)
-							} else {
-								c.Println("Field %s not found in table %s", arg, tableName)
-								return
-
-							}
-						}
-					}
-				}
-				// Use a buffer to store the generated output table
-				buffer := bytes.Buffer{}
-				mtype := ovsdbShell.(*OvsdbShell).dbModel.Types()[c.Cmd.Name]
-				printer, err := NewStructPrinter(&buffer, mtype.Elem(), columns...)
-				if err != nil {
-					c.Println(err)
-					return
-				}
-
-				valueList := reflect.New(reflect.SliceOf(mtype.Elem()))
-				ovsPtr := ovsdbShell.(*OvsdbShell).ovs
-				if ovsPtr == nil {
-					c.Println("No ovs client")
-					return
-				}
-				if filter != "" {
-					cond, err := s.filterAPI(tableName, filter)
-					if err != nil {
-						c.Println(err)
-						return
-					}
-					err = cond.List(valueList.Interface())
-					if err != nil && err != client.ErrNotFound {
-						c.Println(err)
-						return
-					}
-				} else {
-					err = (*ovsPtr).List(valueList.Interface())
-					if err != nil && err != client.ErrNotFound {
-						c.Println(err)
-						return
-					}
-				}
-
-				// Render the result table
-				err = printer.Append(reflect.Indirect(valueList).Interface())
-				if err != nil {
-					c.Println(err)
-				}
-				printer.Render()
-				// Print the result table through shell so it can be paged
-				if err := c.ShowPaged(buffer.String()); err != nil {
-					panic(err)
-				}
+				ovsdbShell.(*OvsdbShell).listTable(tableName, c)
 			},
 			CompleterWithPrefix: func(prefix string, args []string) []string {
 				return s.listAutoComplete(tableName, prefix, args)
@@ -420,7 +346,7 @@ func (s *OvsdbShell) filterAPI(tableName string, expr string) (client.Conditiona
 
 	fieldVal.Set(reflect.ValueOf(value))
 
-	return (*s.ovs).Where(condModel), nil
+	return s.ovs.Where(condModel), nil
 }
 
 // listAutoComplete returns the list of strings to use for list command auto-completion
@@ -459,6 +385,74 @@ func (s *OvsdbShell) exactFieldName(tableName string, field string) (string, boo
 		}
 	}
 	return "", false
+}
+
+func (s *OvsdbShell) listTable(tableName string, c *ishell.Context) {
+	columns := []string{}
+	var filter string
+	var err error
+	isFilter := false
+	for _, arg := range c.Args {
+		if arg == "--filter" {
+			isFilter = true
+		} else {
+			if isFilter {
+				if filter != "" {
+					c.Println("Only one --filter statement allowed")
+					return
+				}
+				filter = arg
+				isFilter = false
+			} else {
+				if col, exists := s.exactFieldName(tableName, arg); exists {
+					columns = append(columns, col)
+				} else {
+					c.Printf("Field %s not found in table %s\n", arg, tableName)
+					return
+
+				}
+			}
+		}
+	}
+	// Use a buffer to store the generated output table
+	buffer := bytes.Buffer{}
+	mtype := s.dbModel.Types()[c.Cmd.Name]
+	printer, err := NewStructPrinter(&buffer, mtype.Elem(), columns...)
+	if err != nil {
+		c.Println(err)
+		return
+	}
+
+	valueList := reflect.New(reflect.SliceOf(mtype.Elem()))
+	if filter != "" {
+		cond, err := s.filterAPI(tableName, filter)
+		if err != nil {
+			c.Println(err)
+			return
+		}
+		err = cond.List(valueList.Interface())
+		if err != nil && err != client.ErrNotFound {
+			c.Println(err)
+			return
+		}
+	} else {
+		err = s.ovs.List(valueList.Interface())
+		if err != nil && err != client.ErrNotFound {
+			c.Println(err)
+			return
+		}
+	}
+
+	// Render the result table
+	err = printer.Append(reflect.Indirect(valueList).Interface())
+	if err != nil {
+		c.Println(err)
+	}
+	printer.Render()
+	// Print the result table through shell so it can be paged
+	if err := c.ShowPaged(buffer.String()); err != nil {
+		panic(err)
+	}
 }
 
 // addLower expands the given slice of fields with their lower case alternatives
