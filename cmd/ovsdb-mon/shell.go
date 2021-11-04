@@ -43,6 +43,8 @@ type OvsdbShell struct {
 	dbModel         *model.DBModel
 	events          []OvsdbEvent
 	tablesToMonitor []client.TableMonitor
+	// Cache metadata used for command autocompletion
+	tableFields map[string][]string // holds exact names of fields indexed by table
 }
 
 func (s *OvsdbShell) Monitor(monitor bool) {
@@ -210,21 +212,6 @@ func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 		Help: "List the content of a specific table",
 	}
 
-	// Generate the list of columns for each table to be used as command auto-completion options
-	exactTableFields := make(map[string][]string) // holds exact names
-	allTableFields := make(map[string][]string)   // holds exact names and lower case versions
-	for tname, mtype := range s.dbModel.Types() {
-		exactFields := []string{}
-		allFields := []string{}
-		for i := 0; i < mtype.Elem().NumField(); i++ {
-			exactFields = append(exactFields, mtype.Elem().Field(i).Name)
-			allFields = append(allFields, mtype.Elem().Field(i).Name)
-			allFields = append(allFields, strings.ToLower(mtype.Elem().Field(i).Name))
-		}
-		allTableFields[tname] = allFields
-		exactTableFields[tname] = exactFields
-	}
-
 	for name := range s.dbModel.Types() {
 		// Trick to be able to use name inside closures
 		tableName := name
@@ -237,7 +224,7 @@ func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 				fmt.Sprintf("\n\n%s [--filter Field=Value] [Field1 Field2 ...]", name) +
 				"\n\t[Field1 Field2 ...]: List of fields to show (default: all fields will be shown)" +
 				"\n\t[--filter Field=Value]: Apply filter (only fields that are part of the table's index can be specified" +
-				fmt.Sprintf("\n\t\tPossible Fields: %s", strings.Join(exactTableFields[name], ", ")),
+				fmt.Sprintf("\n\t\tPossible Fields: %s", strings.Join(s.tableFields[name], ", ")),
 			Func: func(c *ishell.Context) {
 				ovsdbShell := c.Get(sname)
 				if ovsdbShell == nil {
@@ -260,7 +247,13 @@ func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 							filter = arg
 							isFilter = false
 						} else {
-							columns = append(columns, arg)
+							if col, exists := s.exactFieldName(tableName, arg); exists {
+								columns = append(columns, col)
+							} else {
+								c.Println("Field %s not found in table %s", arg, tableName)
+								return
+
+							}
 						}
 					}
 				}
@@ -310,10 +303,7 @@ func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 				}
 			},
 			CompleterWithPrefix: func(prefix string, args []string) []string {
-				if prefix == "" {
-					return exactTableFields[tableName]
-				}
-				return allTableFields[tableName]
+				return s.listAutoComplete(tableName, prefix, args)
 			},
 		}
 		listCmd.AddCmd(&subTableCmd)
@@ -345,11 +335,22 @@ func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 }
 
 func newOvsdbShell(auto bool, dbmodel *model.DBModel, tablesToMonitor []client.TableMonitor) *OvsdbShell {
+	// Generate the list of columns for each table to be used as command auto-completion options
+	tableFields := make(map[string][]string)
+	for tname, mtype := range dbmodel.Types() {
+		fields := []string{}
+		for i := 0; i < mtype.Elem().NumField(); i++ {
+			fields = append(fields, mtype.Elem().Field(i).Name)
+		}
+		tableFields[tname] = fields
+
+	}
 	return &OvsdbShell{
 		mutex:           new(sync.RWMutex),
 		monitor:         auto,
 		dbModel:         dbmodel,
 		tablesToMonitor: tablesToMonitor,
+		tableFields:     tableFields,
 	}
 }
 
@@ -402,4 +403,31 @@ func (s *OvsdbShell) filterAPI(tableName string, expr string) (client.Conditiona
 	fieldVal.Set(reflect.ValueOf(value))
 
 	return (*s.ovs).Where(condModel), nil
+}
+
+// listAutoComplete retuns the list of strings to use for list command auto-completion
+func (s *OvsdbShell) listAutoComplete(tableName string, prefix string, args []string) []string {
+	if prefix == "" {
+		return s.tableFields[tableName]
+	}
+	return s.addLower(s.tableFields[tableName])
+}
+
+// exactFieldName returns the exact field name based on a field name that might have different capitalization
+func (s *OvsdbShell) exactFieldName(tableName string, field string) (string, bool) {
+	stype := s.dbModel.Types()[tableName].Elem()
+	for i := 0; i < stype.NumField(); i++ {
+		if strings.EqualFold(stype.Field(i).Name, field) {
+			return stype.Field(i).Name, true
+		}
+	}
+	return "", false
+}
+
+// addLower expands the given slice of fields with their lower case alternatives
+func (s *OvsdbShell) addLower(fields []string) []string {
+	for _, field := range fields {
+		fields = append(fields, strings.ToLower(field))
+	}
+	return fields
 }
