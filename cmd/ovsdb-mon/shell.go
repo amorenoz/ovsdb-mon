@@ -45,6 +45,7 @@ type OvsdbShell struct {
 	tablesToMonitor []client.TableMonitor
 	// Cache metadata used for command autocompletion
 	tableFields map[string][]string // holds exact names of fields indexed by table
+	indexes     map[string][]string // holds name of the index fields indexed by table
 }
 
 func (s *OvsdbShell) Monitor(monitor bool) {
@@ -135,6 +136,21 @@ func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 		panic(err)
 	}
 
+	for tableName, tableSchema := range ovs.Schema().Tables {
+		indexes := []string{"UUID"}
+		for _, idx := range tableSchema.Indexes {
+			if len(idx) > 1 {
+				// Multi-column index not supported
+				continue
+			}
+			if field, ok := s.exactFieldName(tableName, idx[0]); ok {
+				indexes = append(indexes, field)
+			}
+
+		}
+		s.indexes[tableName] = indexes
+	}
+
 	shell := ishell.New()
 	if shell == nil {
 		panic("Failed to create shell")
@@ -222,8 +238,9 @@ func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 			LongHelp: fmt.Sprintf(
 				"List the content of Table %s", name) +
 				fmt.Sprintf("\n\n%s [--filter Field=Value] [Field1 Field2 ...]", name) +
+				"\n\t[--filter Field=Value]: Apply filter (only fields that are part of the table's index can be specified)" +
+				fmt.Sprintf("\n\t\tPossible Filter Fields: %s", strings.Join(s.indexes[tableName], ", ")) +
 				"\n\t[Field1 Field2 ...]: List of fields to show (default: all fields will be shown)" +
-				"\n\t[--filter Field=Value]: Apply filter (only fields that are part of the table's index can be specified" +
 				fmt.Sprintf("\n\t\tPossible Fields: %s", strings.Join(s.tableFields[name], ", ")),
 			Func: func(c *ishell.Context) {
 				ovsdbShell := c.Get(sname)
@@ -351,6 +368,7 @@ func newOvsdbShell(auto bool, dbmodel *model.DBModel, tablesToMonitor []client.T
 		dbModel:         dbmodel,
 		tablesToMonitor: tablesToMonitor,
 		tableFields:     tableFields,
+		indexes:         make(map[string][]string),
 	}
 }
 
@@ -405,12 +423,31 @@ func (s *OvsdbShell) filterAPI(tableName string, expr string) (client.Conditiona
 	return (*s.ovs).Where(condModel), nil
 }
 
-// listAutoComplete retuns the list of strings to use for list command auto-completion
+// listAutoComplete returns the list of strings to use for list command auto-completion
 func (s *OvsdbShell) listAutoComplete(tableName string, prefix string, args []string) []string {
-	if prefix == "" {
-		return s.tableFields[tableName]
+	autocomplete := []string{}
+	// Find where "--filter" is in the args
+	filterIndex := -1
+	for i, arg := range args {
+		if arg == "--filter" {
+			filterIndex = i
+			break
+		}
 	}
-	return s.addLower(s.tableFields[tableName])
+	switch filterIndex {
+	case -1: // --filter has not been used yet, offer it
+		autocomplete = append(s.tableFields[tableName], "--filter")
+	case len(args) - 1: // We're autocompeting a filter, return the indexes and append "="
+		for _, f := range s.indexes[tableName] {
+			autocomplete = append(autocomplete, f+"=")
+		}
+	default: // filter has already been processed
+		autocomplete = s.tableFields[tableName]
+	}
+	if prefix != "" {
+		autocomplete = addLower(autocomplete)
+	}
+	return autocomplete
 }
 
 // exactFieldName returns the exact field name based on a field name that might have different capitalization
@@ -425,9 +462,12 @@ func (s *OvsdbShell) exactFieldName(tableName string, field string) (string, boo
 }
 
 // addLower expands the given slice of fields with their lower case alternatives
-func (s *OvsdbShell) addLower(fields []string) []string {
+func addLower(fields []string) []string {
 	for _, field := range fields {
-		fields = append(fields, strings.ToLower(field))
+		lower := strings.ToLower(field)
+		if lower != field {
+			fields = append(fields, lower)
+		}
 	}
 	return fields
 }
