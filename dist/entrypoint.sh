@@ -3,8 +3,6 @@ set -ex
 
 export OVS_RUNDIR=${OVS_RUNDIR:-/run/ovn}
 
-git clone https://github.com/amorenoz/ovsdb-mon
-
 pushd ovsdb-mon
 
 declare -A db_schemas=( ["OVN_Northbound"]="ovnnb_db.sock" ["OVN_Southbound"]="ovnsb_db.sock" ["Open_vSwitch"]="db.sock")
