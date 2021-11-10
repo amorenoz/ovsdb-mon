@@ -39,10 +39,13 @@ type OvsdbEvent struct {
 type OvsdbShell struct {
 	mutex           *sync.RWMutex
 	monitor         bool
-	ovs             *client.Client
+	ovs             client.Client
 	dbModel         *model.DBModel
 	events          []OvsdbEvent
 	tablesToMonitor []client.TableMonitor
+	// Cache metadata used for command autocompletion
+	tableFields map[string][]string // holds exact names of fields indexed by table
+	indexes     map[string][]string // holds name of the index fields indexed by table
 }
 
 func (s *OvsdbShell) Monitor(monitor bool) {
@@ -120,17 +123,28 @@ func (s *OvsdbShell) Save(filePath string) error {
 	return ioutil.WriteFile(filePath, content, 0644)
 }
 
-func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
-	s.ovs = ovsPtr
-	if ovsPtr == nil {
-		panic("Failed to de-reference ovs client")
-	}
-	ovs := *ovsPtr
-	ovs.Cache().AddEventHandler(s)
+func (s *OvsdbShell) Run(ovs client.Client, args ...string) {
+	s.ovs = ovs
+	s.ovs.Cache().AddEventHandler(s)
 
 	// if _, err := ovs.MonitorAll(context.Background()); err != nil {
-	if _, err := ovs.Monitor(context.Background(), s.tablesToMonitor...); err != nil {
+	if _, err := s.ovs.Monitor(context.Background(), s.tablesToMonitor...); err != nil {
 		panic(err)
+	}
+
+	for tableName, tableSchema := range s.ovs.Schema().Tables {
+		indexes := []string{"UUID"}
+		for _, idx := range tableSchema.Indexes {
+			if len(idx) > 1 {
+				// Multi-column index not supported
+				continue
+			}
+			if field, ok := s.exactFieldName(tableName, idx[0]); ok {
+				indexes = append(indexes, field)
+			}
+
+		}
+		s.indexes[tableName] = indexes
 	}
 
 	shell := ishell.New()
@@ -194,7 +208,7 @@ func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 
 			ovsPtr := ovsdbShell.(*OvsdbShell).ovs
 			if ovsPtr != nil {
-				for name := range (*ovsPtr).Schema().Tables {
+				for name := range s.ovs.Schema().Tables {
 					c.Println(name)
 				}
 			} else {
@@ -210,75 +224,29 @@ func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 		Help: "List the content of a specific table",
 	}
 
-	// Generate the list of columns for each table to be used as command auto-completion options
-	exactTableFields := make(map[string][]string) // holds exact names
-	allTableFields := make(map[string][]string)   // holds exact names and lower case versions
-	for tname, mtype := range s.dbModel.Types() {
-		exactFields := []string{}
-		allFields := []string{}
-		for i := 0; i < mtype.Elem().NumField(); i++ {
-			exactFields = append(exactFields, mtype.Elem().Field(i).Name)
-			allFields = append(allFields, mtype.Elem().Field(i).Name)
-			allFields = append(allFields, strings.ToLower(mtype.Elem().Field(i).Name))
-		}
-		allTableFields[tname] = allFields
-		exactTableFields[tname] = exactFields
-	}
-
 	for name := range s.dbModel.Types() {
 		// Trick to be able to use name inside closures
 		tableName := name
 		subTableCmd := ishell.Cmd{
 			Name:    name,
 			Aliases: []string{strings.ToLower(name)},
-			Help:    fmt.Sprintf("%s [Field1 Field2 ...]", name),
+			Help:    fmt.Sprintf("%s [--filter Field=Value] [Field1 Field2 ...]", name),
 			LongHelp: fmt.Sprintf(
 				"List the content of Table %s", name) +
-				fmt.Sprintf("\n\n%s [Field1 Field2 ...]", name) +
+				fmt.Sprintf("\n\n%s [--filter Field=Value] [Field1 Field2 ...]", name) +
+				"\n\t[--filter Field=Value]: Apply filter (only fields that are part of the table's index can be specified)" +
+				fmt.Sprintf("\n\t\tPossible Filter Fields: %s", strings.Join(s.indexes[tableName], ", ")) +
 				"\n\t[Field1 Field2 ...]: List of fields to show (default: all fields will be shown)" +
-				fmt.Sprintf("\n\t\tPossible Fields: %s", strings.Join(exactTableFields[name], ", ")),
+				fmt.Sprintf("\n\t\tPossible Fields: %s", strings.Join(s.tableFields[name], ", ")),
 			Func: func(c *ishell.Context) {
 				ovsdbShell := c.Get(sname)
 				if ovsdbShell == nil {
 					c.Println("Error: No context")
 				}
-				// Use a buffer to store the generated output table
-				buffer := bytes.Buffer{}
-				mtype := ovsdbShell.(*OvsdbShell).dbModel.Types()[c.Cmd.Name]
-				printer, err := NewStructPrinter(&buffer, mtype.Elem(), c.Args...)
-				if err != nil {
-					c.Println(err)
-					return
-				}
-
-				valueList := reflect.New(reflect.SliceOf(mtype.Elem()))
-				ovsPtr := ovsdbShell.(*OvsdbShell).ovs
-				if ovsPtr == nil {
-					c.Println("No ovs client")
-					return
-				}
-				err = (*ovsPtr).List(valueList.Interface())
-				if err != nil && err != client.ErrNotFound {
-					c.Println(err)
-					return
-				}
-
-				// Render the result table
-				err = printer.Append(reflect.Indirect(valueList).Interface())
-				if err != nil {
-					c.Println(err)
-				}
-				printer.Render()
-				// Print the result table through shell so it can be paged
-				if err := c.ShowPaged(buffer.String()); err != nil {
-					panic(err)
-				}
+				ovsdbShell.(*OvsdbShell).listTable(tableName, c)
 			},
 			CompleterWithPrefix: func(prefix string, args []string) []string {
-				if prefix == "" {
-					return exactTableFields[tableName]
-				}
-				return allTableFields[tableName]
+				return s.listAutoComplete(tableName, prefix, args)
 			},
 		}
 		listCmd.AddCmd(&subTableCmd)
@@ -310,11 +278,23 @@ func (s *OvsdbShell) Run(ovsPtr *client.Client, args ...string) {
 }
 
 func newOvsdbShell(auto bool, dbmodel *model.DBModel, tablesToMonitor []client.TableMonitor) *OvsdbShell {
+	// Generate the list of columns for each table to be used as command auto-completion options
+	tableFields := make(map[string][]string)
+	for tname, mtype := range dbmodel.Types() {
+		fields := []string{}
+		for i := 0; i < mtype.Elem().NumField(); i++ {
+			fields = append(fields, mtype.Elem().Field(i).Name)
+		}
+		tableFields[tname] = fields
+
+	}
 	return &OvsdbShell{
 		mutex:           new(sync.RWMutex),
 		monitor:         auto,
 		dbModel:         dbmodel,
 		tablesToMonitor: tablesToMonitor,
+		tableFields:     tableFields,
+		indexes:         make(map[string][]string),
 	}
 }
 
@@ -337,4 +317,151 @@ func colordiff(a, b interface{}) string {
 		}
 	}
 	return strings.TrimRight(buf.String(), "\n")
+}
+
+// filterAPI returns the conditional API that filters based on the provided filter expression
+// Expression is [FIELD]=[VALUE]
+func (s *OvsdbShell) filterAPI(tableName string, expr string) (client.ConditionalAPI, error) {
+	condModel, err := s.dbModel.NewModel(tableName)
+	if err != nil {
+		return nil, err
+	}
+	parts := strings.Split(expr, "=")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("Invalid filter expression: %s. Use: [FIELD]=[VALUE]", expr)
+	}
+
+	field := parts[0]
+	value := parts[1]
+
+	fieldName, present := s.exactFieldName(tableName, field)
+	if !present {
+		return nil, fmt.Errorf("field %s not present in database table %s", field, tableName)
+	}
+
+	fieldVal := reflect.ValueOf(condModel).Elem().FieldByName(fieldName)
+	if fieldVal.Kind() != reflect.String {
+		return nil, fmt.Errorf("filters only support string values")
+	}
+
+	fieldVal.Set(reflect.ValueOf(value))
+
+	return s.ovs.Where(condModel), nil
+}
+
+// listAutoComplete returns the list of strings to use for list command auto-completion
+func (s *OvsdbShell) listAutoComplete(tableName string, prefix string, args []string) []string {
+	autocomplete := []string{}
+	// Find where "--filter" is in the args
+	filterIndex := -1
+	for i, arg := range args {
+		if arg == "--filter" {
+			filterIndex = i
+			break
+		}
+	}
+	switch filterIndex {
+	case -1: // --filter has not been used yet, offer it
+		autocomplete = append(s.tableFields[tableName], "--filter")
+	case len(args) - 1: // We're autocompeting a filter, return the indexes and append "="
+		for _, f := range s.indexes[tableName] {
+			autocomplete = append(autocomplete, f+"=")
+		}
+	default: // filter has already been processed
+		autocomplete = s.tableFields[tableName]
+	}
+	if prefix != "" {
+		autocomplete = addLower(autocomplete)
+	}
+	return autocomplete
+}
+
+// exactFieldName returns the exact field name based on a field name that might have different capitalization
+func (s *OvsdbShell) exactFieldName(tableName string, field string) (string, bool) {
+	stype := s.dbModel.Types()[tableName].Elem()
+	for i := 0; i < stype.NumField(); i++ {
+		if strings.EqualFold(stype.Field(i).Name, field) {
+			return stype.Field(i).Name, true
+		}
+	}
+	return "", false
+}
+
+func (s *OvsdbShell) listTable(tableName string, c *ishell.Context) {
+	columns := []string{}
+	var filter string
+	var err error
+	isFilter := false
+	for _, arg := range c.Args {
+		if arg == "--filter" {
+			isFilter = true
+		} else {
+			if isFilter {
+				if filter != "" {
+					c.Println("Only one --filter statement allowed")
+					return
+				}
+				filter = arg
+				isFilter = false
+			} else {
+				if col, exists := s.exactFieldName(tableName, arg); exists {
+					columns = append(columns, col)
+				} else {
+					c.Printf("Field %s not found in table %s\n", arg, tableName)
+					return
+
+				}
+			}
+		}
+	}
+	// Use a buffer to store the generated output table
+	buffer := bytes.Buffer{}
+	mtype := s.dbModel.Types()[c.Cmd.Name]
+	printer, err := NewStructPrinter(&buffer, mtype.Elem(), columns...)
+	if err != nil {
+		c.Println(err)
+		return
+	}
+
+	valueList := reflect.New(reflect.SliceOf(mtype.Elem()))
+	if filter != "" {
+		cond, err := s.filterAPI(tableName, filter)
+		if err != nil {
+			c.Println(err)
+			return
+		}
+		err = cond.List(valueList.Interface())
+		if err != nil && err != client.ErrNotFound {
+			c.Println(err)
+			return
+		}
+	} else {
+		err = s.ovs.List(valueList.Interface())
+		if err != nil && err != client.ErrNotFound {
+			c.Println(err)
+			return
+		}
+	}
+
+	// Render the result table
+	err = printer.Append(reflect.Indirect(valueList).Interface())
+	if err != nil {
+		c.Println(err)
+	}
+	printer.Render()
+	// Print the result table through shell so it can be paged
+	if err := c.ShowPaged(buffer.String()); err != nil {
+		panic(err)
+	}
+}
+
+// addLower expands the given slice of fields with their lower case alternatives
+func addLower(fields []string) []string {
+	for _, field := range fields {
+		lower := strings.ToLower(field)
+		if lower != field {
+			fields = append(fields, lower)
+		}
+	}
+	return fields
 }

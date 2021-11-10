@@ -60,19 +60,7 @@ func NewStructPrinter(writer io.Writer, stype reflect.Type, fieldSel ...string) 
 	table := tablewriter.NewWriter(writer)
 
 	if len(fieldSel) > 0 {
-		for _, sel := range fieldSel {
-			found := false
-			for i := 0; i < stype.NumField(); i++ {
-				if strings.EqualFold(stype.Field(i).Name, sel) {
-					found = true
-					cols = append(cols, stype.Field(i).Name)
-					break
-				}
-			}
-			if !found {
-				return nil, fmt.Errorf("Field %s not found in Type %s", sel, stype.Name())
-			}
-		}
+		cols = fieldSel
 	} else {
 		for i := 0; i < stype.NumField(); i++ {
 			field := stype.Field(i).Name

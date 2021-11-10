@@ -13,7 +13,8 @@ RUN INSTALL_PKGS=" \
 
 ENV GOPATH=$HOME/go
 
-ADD dist/entrypoint.sh /root/entrypoint.sh
+ADD . /root/ovsdb-mon
+RUN cp dist/entrypoint.sh /root/entrypoint.sh
 
 WORKDIR /root
 ENTRYPOINT /root/entrypoint.sh

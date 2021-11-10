@@ -65,5 +65,5 @@ func main() {
 		log.Fatal(err)
 	}
 	defer c.Disconnect()
-	shell.Run(&c, flag.Args()...)
+	shell.Run(c, flag.Args()...)
 }
