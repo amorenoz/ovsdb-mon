@@ -63,6 +63,10 @@ provide a ready to use binary for the K8 cluster.
     source ./ovsdb-mon-ovn.source
     source ./ovsdb-mon-ovs.source
 
+**Note:** Pod Security Admission must be taken into account when deploying ovsdb-mon,
+since it needs to access the host network. Being so, a namespace will be created
+with the required labels, and used by ovsdb-mon pod(s).
+For more info, see [the pod-security-admission documentation](https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces).
 
 ### Local machine (e.g: Openstack node)
 

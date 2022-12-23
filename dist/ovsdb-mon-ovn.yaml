@@ -3,6 +3,8 @@ kind: Pod
 metadata:
   name: ovsdb-mon-ovn
 spec:
+  securityContext:
+    runAsUser: 0
   containers:
   - name: ovsdb-mon-ovn
     image: quay.io/amorenoz/ovsdb-mon:latest

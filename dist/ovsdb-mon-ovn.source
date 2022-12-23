@@ -4,16 +4,36 @@ then
     exit 1
 fi
 
-kubectl apply -f ./ovsdb-mon-ovn.yaml || { >&2 echo 'bad k8s?'; return; }
+kubectl create namespace ovsdb-mon --dry-run=client -o yaml | kubectl apply -f - 2>&1 | \
+    grep -v "kubectl.kubernetes.io/last-applied-configuration"
+kubectl label namespace ovsdb-mon --overwrite \
+    pod-security.kubernetes.io/enforce=privileged \
+    pod-security.kubernetes.io/audit=privileged \
+    pod-security.kubernetes.io/warn=privileged \
+    security.openshift.io/scc.podSecurityLabelSync=false
+until [[ $(kubectl get sa default -n ovsdb-mon -o=jsonpath='{.metadata.creationTimestamp}') ]]; do \
+    echo "waiting for service account for ovsdb-mon namespace to exist..."; sleep 3; done
+
+# If oc scc resource exists, configure role that allows ovsdb-mon to have priviledged access
+ocbin=$(which oc 2>/dev/null)
+[ -x "$ocbin" ] && scc=$($ocbin api-resources | grep securitycontextconstraints)
+if [ -n "$scc" ] ; then
+    $ocbin get rolebinding ovsdb-mon --no-headers -n ovsdb-mon 2>/dev/null || \
+    { $ocbin create role ovsdb-mon --verb=use --resource=scc --resource-name=privileged -n ovsdb-mon ;
+      $ocbin create rolebinding ovsdb-mon --role=ovsdb-mon --group=system:serviceaccounts:ovsdb-mon -n ovsdb-mon ; }
+fi
+
+kubectl apply -n ovsdb-mon -f ./ovsdb-mon-ovn.yaml || { >&2 echo 'bad k8s?'; return; }
 
 echo waiting for pod to become ready...
-kubectl wait --for=condition=ready pod/ovsdb-mon-ovn \
+kubectl wait -n ovsdb-mon --for=condition=ready pod/ovsdb-mon-ovn \
     --timeout=300s || { >&2 echo 'failed: error pod not ready' ; return; }
 
-alias ovsdb-mon.nb='kubectl exec -it ovsdb-mon-ovn -- ovsdb-mon.OVN_Northbound'
-alias ovsdb-mon.sb='kubectl exec -it ovsdb-mon-ovn -- ovsdb-mon.OVN_Southbound'
+alias ovsdb-mon.nb='kubectl exec -n ovsdb-mon -it ovsdb-mon-ovn -- ovsdb-mon.OVN_Northbound'
+alias ovsdb-mon.sb='kubectl exec -n ovsdb-mon -it ovsdb-mon-ovn -- ovsdb-mon.OVN_Southbound'
 
-echo 'to remove pod created, do: kubectl delete pod/ovsdb-mon-ovn'
+echo 'to remove pod created, do: kubectl delete -n ovsdb-mon pod/ovsdb-mon-ovn'
+echo 'to remove namespace created, do: kubectl delete -n ovsdb-mon ns/ovsdb-mon'
 echo 'commands to try:'
 echo '   ovsdb-mon.nb -auto -no-monitor nb_global,connection'
 echo '   ovsdb-mon.sb -auto -monitor Logical_Flow'

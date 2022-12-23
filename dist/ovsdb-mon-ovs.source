@@ -4,12 +4,31 @@ then
     exit 1
 fi
 
-kubectl apply -f ./ovsdb-mon-ds.yaml || { >&2 echo 'bad k8s?'; return; }
+kubectl create namespace ovsdb-mon --dry-run=client -o yaml | kubectl apply -f - 2>&1 | \
+    grep -v "kubectl.kubernetes.io/last-applied-configuration"
+kubectl label namespace ovsdb-mon --overwrite \
+    pod-security.kubernetes.io/enforce=privileged \
+    pod-security.kubernetes.io/audit=privileged \
+    pod-security.kubernetes.io/warn=privileged \
+    security.openshift.io/scc.podSecurityLabelSync=false
+until [[ $(kubectl get sa default -n ovsdb-mon -o=jsonpath='{.metadata.creationTimestamp}') ]]; do \
+    echo "waiting for service account for ovsdb-mon namespace to exist..."; sleep 3; done
+
+# If oc scc resource exists, configure role that allows ovsdb-mon to have priviledged access
+ocbin=$(which oc 2>/dev/null)
+[ -x "$ocbin" ] && scc=$($ocbin api-resources | grep securitycontextconstraints)
+if [ -n "$scc" ] ; then
+    $ocbin get rolebinding ovsdb-mon --no-headers -n ovsdb-mon 2>/dev/null || \
+    { $ocbin create role ovsdb-mon --verb=use --resource=scc --resource-name=privileged -n ovsdb-mon ;
+      $ocbin create rolebinding ovsdb-mon --role=ovsdb-mon --group=system:serviceaccounts:ovsdb-mon -n ovsdb-mon ; }
+fi
+
+kubectl apply -n ovsdb-mon -f ./ovsdb-mon-ds.yaml || { >&2 echo 'bad k8s?'; return; }
 
 # create handy aliases for easy usage of ovsdb-mon.ovs
 DS='ovsdb-mon-ovs'
 POD_TUPLES=$(
-kubectl get pod  \
+kubectl get pod -n ovsdb-mon \
   -o jsonpath='{range .items[*]}{.spec.nodeName}{"/"}{.metadata.name}{" "}{end}' | grep ${DS} )
 
 set -y 2>/dev/null ||:  ; # this is for the zsh users out there
@@ -18,15 +37,15 @@ for POD_TUPLE in $POD_TUPLES ; do \
    NODE=$(echo $POD_TUPLE | cut -d/ -f1)
    POD=$(echo $POD_TUPLE | cut -d/ -f2)
    echo $NODE has pod ${POD} . Creating alias ovsdb-mon.ovs.$NODE
-   alias ovsdb-mon.ovs.$NODE="kubectl exec -it $POD -- ovsdb-mon.Open_vSwitch"
+   alias ovsdb-mon.ovs.$NODE="kubectl exec -n ovsdb-mon -it $POD -- ovsdb-mon.Open_vSwitch"
 done
 
 echo
-kubectl get ds ${DS}
+kubectl get ds -n ovsdb-mon ${DS}
 echo
-echo "to remove daemonset created, do: kubectl delete ds ${DS}"
+echo "to remove daemonset created, do: kubectl delete -n ovsdb-mon ds ${DS}"
 echo 'commands to try (after pod becomes ready):'
 echo "   ovsdb-mon.ovs.${NODE} list Interface Name Ofport ExternalIDs"
-echo "   kubectl exec -it ${POD} -- ovs-vsctl show"
-echo "   kubectl exec -it ${POD} -- ovs-ofctl --names dump-flows br-int table=0 | cut -d',' -f3-"
+echo "   kubectl exec -n ovsdb-mon -it ${POD} -- ovs-vsctl show"
+echo "   kubectl exec -n ovsdb-mon -it ${POD} -- ovs-ofctl --names dump-flows br-int table=0 | cut -d',' -f3-"
 echo
