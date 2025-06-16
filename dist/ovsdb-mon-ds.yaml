@@ -12,9 +12,7 @@ spec:
         name: ovsdb-mon
     spec:
       tolerations:
-        - key: node-role.kubernetes.io/master
-          operator: Exists
-          effect: NoSchedule
+        - operator: Exists
       securityContext:
         runAsUser: 0
       containers:

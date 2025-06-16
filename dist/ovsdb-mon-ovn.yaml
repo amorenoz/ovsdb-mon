@@ -35,8 +35,7 @@ spec:
       type: ""
     name: run-ovs
   tolerations:
-  - key: node-role.kubernetes.io/master
-    operator: Exists
+  - operator: Exists
   hostNetwork: true
   affinity:
     nodeAffinity:
