@@ -14,8 +14,8 @@ import (
 	ishell "github.com/abiosoft/ishell/v2"
 	"github.com/kylelemons/godebug/diff"
 	"github.com/kylelemons/godebug/pretty"
-	"github.com/ovn-org/libovsdb/client"
-	"github.com/ovn-org/libovsdb/model"
+	"github.com/ovn-kubernetes/libovsdb/client"
+	"github.com/ovn-kubernetes/libovsdb/model"
 )
 
 type eventType string
@@ -37,21 +37,21 @@ type OvsdbEvent struct {
 }
 
 type OvsdbShell struct {
-	mutex           *sync.RWMutex
-	monitor         bool
-	ovs             client.Client
-	dbModel         *model.DBModel
-	events          []OvsdbEvent
-	tablesToMonitor []client.TableMonitor
+	mutex   *sync.RWMutex
+	do_monitor bool
+	ovs     client.Client
+	dbModel *model.ClientDBModel
+	events  []OvsdbEvent
+	monitorOptions []client.MonitorOption
 	// Cache metadata used for command autocompletion
 	tableFields map[string][]string // holds exact names of fields indexed by table
 	indexes     map[string][]string // holds name of the index fields indexed by table
 }
 
-func (s *OvsdbShell) Monitor(monitor bool) {
+func (s *OvsdbShell) Monitor(do bool) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	s.monitor = monitor
+	s.do_monitor = do
 }
 
 func (s *OvsdbShell) printEvent(event OvsdbEvent) {
@@ -70,7 +70,7 @@ func (s *OvsdbShell) printEvent(event OvsdbEvent) {
 func (s *OvsdbShell) OnAdd(table string, m model.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	if s.monitor {
+	if s.do_monitor {
 		event := OvsdbEvent{
 			Timestamp: time.Now(),
 			Event:     addEvent,
@@ -85,7 +85,7 @@ func (s *OvsdbShell) OnAdd(table string, m model.Model) {
 func (s *OvsdbShell) OnUpdate(table string, old, new model.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	if s.monitor {
+	if s.do_monitor {
 		event := OvsdbEvent{
 			Timestamp: time.Now(),
 			Event:     updateEvent,
@@ -101,7 +101,7 @@ func (s *OvsdbShell) OnUpdate(table string, old, new model.Model) {
 func (s *OvsdbShell) OnDelete(table string, m model.Model) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	if s.monitor {
+	if s.do_monitor {
 		event := OvsdbEvent{
 			Timestamp: time.Now(),
 			Event:     deleteEvent,
@@ -127,8 +127,8 @@ func (s *OvsdbShell) Run(ovs client.Client, args ...string) {
 	s.ovs = ovs
 	s.ovs.Cache().AddEventHandler(s)
 
-	// if _, err := ovs.MonitorAll(context.Background()); err != nil {
-	if _, err := s.ovs.Monitor(context.Background(), s.tablesToMonitor...); err != nil {
+	monitor := s.ovs.NewMonitor(s.monitorOptions...)
+	if _, err := s.ovs.Monitor(context.Background(), monitor); err != nil {
 		panic(err)
 	}
 
@@ -277,7 +277,7 @@ func (s *OvsdbShell) Run(ovs client.Client, args ...string) {
 	}
 }
 
-func newOvsdbShell(auto bool, dbmodel *model.DBModel, tablesToMonitor []client.TableMonitor) *OvsdbShell {
+func newOvsdbShell(auto bool, dbmodel *model.ClientDBModel, monitorOptions []client.MonitorOption) *OvsdbShell {
 	// Generate the list of columns for each table to be used as command auto-completion options
 	tableFields := make(map[string][]string)
 	for tname, mtype := range dbmodel.Types() {
@@ -289,12 +289,12 @@ func newOvsdbShell(auto bool, dbmodel *model.DBModel, tablesToMonitor []client.T
 
 	}
 	return &OvsdbShell{
-		mutex:           new(sync.RWMutex),
-		monitor:         auto,
-		dbModel:         dbmodel,
-		tablesToMonitor: tablesToMonitor,
-		tableFields:     tableFields,
-		indexes:         make(map[string][]string),
+		mutex:       new(sync.RWMutex),
+		do_monitor:     auto,
+		dbModel:        dbmodel,
+		monitorOptions: monitorOptions,
+		tableFields: tableFields,
+		indexes:     make(map[string][]string),
 	}
 }
 
@@ -322,10 +322,11 @@ func colordiff(a, b interface{}) string {
 // filterAPI returns the conditional API that filters based on the provided filter expression
 // Expression is [FIELD]=[VALUE]
 func (s *OvsdbShell) filterAPI(tableName string, expr string) (client.ConditionalAPI, error) {
-	condModel, err := s.dbModel.NewModel(tableName)
-	if err != nil {
-		return nil, err
+	modelType, exists := s.dbModel.Types()[tableName]
+	if !exists {
+		return nil, fmt.Errorf("table %s not found in database model", tableName)
 	}
+	condModel := reflect.New(modelType.Elem()).Interface()
 	parts := strings.Split(expr, "=")
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("Invalid filter expression: %s. Use: [FIELD]=[VALUE]", expr)
@@ -430,13 +431,13 @@ func (s *OvsdbShell) listTable(tableName string, c *ishell.Context) {
 			c.Println(err)
 			return
 		}
-		err = cond.List(valueList.Interface())
+		err = cond.List(context.Background(), valueList.Interface())
 		if err != nil && err != client.ErrNotFound {
 			c.Println(err)
 			return
 		}
 	} else {
-		err = s.ovs.List(valueList.Interface())
+		err = s.ovs.List(context.Background(), valueList.Interface())
 		if err != nil && err != client.ErrNotFound {
 			c.Println(err)
 			return

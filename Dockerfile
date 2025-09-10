@@ -14,7 +14,7 @@ RUN INSTALL_PKGS=" \
 ENV GOPATH=$HOME/go
 
 ADD . /root/ovsdb-mon
-RUN cd /root/ovsdb-mon && go install github.com/ovn-org/libovsdb/cmd/modelgen && go mod vendor
+RUN cd /root/ovsdb-mon && go install github.com/ovn-kubernetes/libovsdb/cmd/modelgen && go mod vendor
 
 RUN ln -s /root/ovsdb-mon/dist/entrypoint.sh /root/entrypoint.sh
 WORKDIR /root

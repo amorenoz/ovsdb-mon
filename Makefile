@@ -12,7 +12,7 @@ $(MODEL_GEN):
 ifeq ($(GOPATH),)
 	$(error GOPATH is not set)
 endif
-	@go install github.com/ovn-org/libovsdb/cmd/modelgen
+	@go install github.com/ovn-kubernetes/libovsdb/cmd/modelgen
 
 .PHONY: build
 build: $(MODEL_GEN)

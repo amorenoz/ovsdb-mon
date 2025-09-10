@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/olekukonko/tablewriter"
-	"github.com/ovn-org/libovsdb/client"
-	"github.com/ovn-org/libovsdb/model"
+	"github.com/ovn-kubernetes/libovsdb/client"
+	"github.com/ovn-kubernetes/libovsdb/model"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -74,7 +74,7 @@ func NewStructPrinter(writer io.Writer, stype reflect.Type, fieldSel ...string) 
 	}, nil
 }
 
-func getTablesToMonitor(dbModel *model.DBModel, monitorTables string, noMonitorTables string) ([]client.TableMonitor, error) {
+func getMonitor(dbModel *model.ClientDBModel, monitorTables string, noMonitorTables string) ([]client.MonitorOption, error) {
 	prettyTableNames := func() string {
 		tableNames := make([]string, 0, len(dbModel.Types()))
 		for tableName := range dbModel.Types() {
@@ -129,11 +129,15 @@ func getTablesToMonitor(dbModel *model.DBModel, monitorTables string, noMonitorT
 		return nil, fmt.Errorf("no tables to monitor, that is kinda sad")
 	}
 
-	tablesToMonitor := make([]client.TableMonitor, 0, len(tablesWanted))
-	for table := range tablesWanted {
-		tableMonitor := client.TableMonitor{Table: table}
-		tablesToMonitor = append(tablesToMonitor, tableMonitor)
+	var monitorOptions []client.MonitorOption
+	for tableName := range tablesWanted {
+		modelType, exists := dbModel.Types()[tableName]
+		if !exists {
+			return nil, fmt.Errorf("table %s not found in database model", tableName)
+		}
+		model := reflect.New(modelType.Elem()).Interface()
+		monitorOptions = append(monitorOptions, client.WithTable(model))
 	}
 
-	return tablesToMonitor, nil
+	return monitorOptions, nil
 }

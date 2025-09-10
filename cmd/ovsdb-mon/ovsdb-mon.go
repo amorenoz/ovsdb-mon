@@ -8,7 +8,7 @@ import (
 	"os"
 
 	model "github.com/amorenoz/ovsdb-mon/model"
-	"github.com/ovn-org/libovsdb/client"
+	"github.com/ovn-kubernetes/libovsdb/client"
 	//"github.com/fatih/color"
 )
 
@@ -50,12 +50,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	tablesToMonitor, err := getTablesToMonitor(dbModel, *monitorTables, *noMonitorTables)
+	monitorOptions, err := getMonitor(&dbModel, *monitorTables, *noMonitorTables)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	shell := newOvsdbShell(*auto, dbModel, tablesToMonitor)
+	shell := newOvsdbShell(*auto, &dbModel, monitorOptions)
 	c, err := client.NewOVSDBClient(dbModel, client.WithEndpoint(addr))
 	if err != nil {
 		log.Fatal(err)

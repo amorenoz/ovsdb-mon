@@ -1,6 +1,6 @@
 # ovsdb-mon
 
-ovsdb-mon is an OVSDB monitoring and visulization tool based on [libovsdb](https://github.com/ovn-org/libovsdb)
+ovsdb-mon is an OVSDB monitoring and visulization tool based on [libovsdb](https://github.com/ovn-kubernetes/libovsdb)
 
 ### Building ovsdb-mon
 A common usage for this tool is to monitor an OVN database. However, it is generic enough to be used with
